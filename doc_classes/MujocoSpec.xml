@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="MujocoSpec" inherits="Node" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+	</brief_description>
+	<description>
+	</description>
+	<tutorials>
+	</tutorials>
+	<constants>
+		<constant name="INTEGRATOR_EULER" value="0" enum="Integrator">
+		</constant>
+		<constant name="INTEGRATOR_RK4" value="1" enum="Integrator">
+		</constant>
+		<constant name="INTEGRATOR_IMPLICIT" value="2" enum="Integrator">
+		</constant>
+		<constant name="INTEGRATOR_IMPLICIT_FAST" value="3" enum="Integrator">
+		</constant>
+		<constant name="CONE_PYRAMIDAL" value="0" enum="Cone">
+		</constant>
+		<constant name="CONE_ELLIPTIC" value="1" enum="Cone">
+		</constant>
+		<constant name="JACOBIAN_DENSE" value="0" enum="Jacobian">
+		</constant>
+		<constant name="JACOBIAN_SPARSE" value="1" enum="Jacobian">
+		</constant>
+		<constant name="JACOBIAN_AUTO" value="2" enum="Jacobian">
+		</constant>
+		<constant name="SOLVER_PGS" value="0" enum="Solver">
+		</constant>
+		<constant name="SOLVER_CG" value="1" enum="Solver">
+		</constant>
+		<constant name="SOLVER_NEWTON" value="2" enum="Solver">
+		</constant>
+		<constant name="DISABLE_CONSTRAINT" value="1" enum="DisableFlags" is_bitfield="true">
+		</constant>
+		<constant name="DISABLE_EQUALITY" value="2" enum="DisableFlags" is_bitfield="true">
+		</constant>
+		<constant name="DISABLE_FRICTIONLOSS" value="4" enum="DisableFlags" is_bitfield="true">
+		</constant>
+		<constant name="DISABLE_LIMIT" value="8" enum="DisableFlags" is_bitfield="true">
+		</constant>
+		<constant name="DISABLE_CONTACT" value="16" enum="DisableFlags" is_bitfield="true">
+		</constant>
+		<constant name="DISABLE_SPRING" value="32" enum="DisableFlags" is_bitfield="true">
+		</constant>
+		<constant name="DISABLE_DAMPER" value="64" enum="DisableFlags" is_bitfield="true">
+		</constant>
+		<constant name="DISABLE_GRAVITY" value="128" enum="DisableFlags" is_bitfield="true">
+		</constant>
+		<constant name="DISABLE_CLAMPCTRL" value="256" enum="DisableFlags" is_bitfield="true">
+		</constant>
+		<constant name="DISABLE_WARMSTART" value="512" enum="DisableFlags" is_bitfield="true">
+		</constant>
+		<constant name="DISABLE_FILTERPARENT" value="1024" enum="DisableFlags" is_bitfield="true">
+		</constant>
+		<constant name="DISABLE_ACTUATION" value="2048" enum="DisableFlags" is_bitfield="true">
+		</constant>
+		<constant name="DISABLE_REFSAFE" value="4096" enum="DisableFlags" is_bitfield="true">
+		</constant>
+		<constant name="DISABLE_SENSOR" value="8192" enum="DisableFlags" is_bitfield="true">
+		</constant>
+		<constant name="DISABLE_MIDPHASE" value="16384" enum="DisableFlags" is_bitfield="true">
+		</constant>
+		<constant name="DISABLE_EULERDAMP" value="32768" enum="DisableFlags" is_bitfield="true">
+		</constant>
+		<constant name="DISABLE_AUTO_RESET" value="65536" enum="DisableFlags" is_bitfield="true">
+		</constant>
+		<constant name="DISABLE_NATIVE_CCD" value="131072" enum="DisableFlags" is_bitfield="true">
+		</constant>
+		<constant name="DISABLE_ISLAND" value="262144" enum="DisableFlags" is_bitfield="true">
+		</constant>
+		<constant name="DISABLE_MULTI_CCD" value="524288" enum="DisableFlags" is_bitfield="true">
+		</constant>
+		<constant name="ENABLE_OVERRIDE" value="1" enum="EnableFlags" is_bitfield="true">
+		</constant>
+		<constant name="ENABLE_ENERGY" value="2" enum="EnableFlags" is_bitfield="true">
+		</constant>
+		<constant name="ENABLE_FWDINV" value="4" enum="EnableFlags" is_bitfield="true">
+		</constant>
+		<constant name="ENABLE_INV_DISCRETE" value="8" enum="EnableFlags" is_bitfield="true">
+		</constant>
+		<constant name="ENABLE_SLEEP" value="16" enum="EnableFlags" is_bitfield="true">
+		</constant>
+		<constant name="ENABLE_DIAG_EXACT" value="32" enum="EnableFlags" is_bitfield="true">
+		</constant>
+	</constants>
+</class>
