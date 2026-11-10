@@ -2,6 +2,7 @@
 #include "mujoco_element.h"
 #include "mujoco_options.h"
 
+#include <algorithm>
 #include <vector>
 
 #include "mujoco_body.h"
@@ -186,6 +187,14 @@ void MujocoWorld::compile()
     body_nodes = std::move(new_body_nodes);
     step_accumulator = 0.0;
     model_generation++;
+    frame_wrenches.assign(static_cast<size_t>(6 * model->nbody), 0.0);
+    step_wrenches.assign(static_cast<size_t>(6 * model->nbody), 0.0);
+    mocap_bodies.clear();
+    for (int id = 1; id < model->nbody; id++) {
+        if (model->body_mocapid[id] >= 0) {
+            mocap_bodies.push_back(id);
+        }
+    }
 
     // At runtime a recompile resets the simulation: put the bodies back.
     if (!Engine::get_singleton()->is_editor_hint()) {
@@ -252,23 +261,56 @@ void MujocoWorld::step_simulation(double p_delta)
     }
 
     if (steps > 0) {
-        // mj_step leaves body poses one step behind the state; bring them up to date.
-        mj_kinematics(model.get(), data.get());
-        sync_bodies();
+        end_frame();
     }
+}
+
+void MujocoWorld::end_frame()
+{
+    std::fill(frame_wrenches.begin(), frame_wrenches.end(), 0.0);
+    if (!model || !data) {
+        return;
+    }
+    mju_zero(data->xfrc_applied, 6 * model->nbody);
+    // mj_step leaves poses and velocities one step behind the state; bring them up to
+    // date for the nodes and for scripts reading velocities. This doesn't change the
+    // simulation: the next mj_step computes the same quantities from the same state.
+    mj_forward(model.get(), data.get());
+    sync_bodies();
 }
 
 void MujocoWorld::step_once()
 {
+    in_pre_step = true;
     emit_signal("pre_step");
+    in_pre_step = false;
     // A pre_step handler may have caused a compile (by reading state while one was
     // queued), so read the pointers only now.
     if (!model || !data) {
         return;
     }
+
+    // Mocap bodies follow their nodes, which scripts move.
+    const Transform3D world_inverse = get_global_transform().affine_inverse();
+    for (int id : mocap_bodies) {
+        const Node3D *node = Object::cast_to<Node3D>(ObjectDB::get_instance(body_nodes[static_cast<size_t>(id)]));
+        if (node) {
+            const int mocap = model->body_mocapid[id];
+            mujoco_convert::to_mujoco(world_inverse * node->get_global_transform(), data->mocap_pos + 3 * mocap, data->mocap_quat + 4 * mocap);
+        }
+    }
+
+    const size_t count = static_cast<size_t>(6 * model->nbody);
+    if (frame_wrenches.size() == count && step_wrenches.size() == count) {
+        for (size_t i = 0; i < count; i++) {
+            data->xfrc_applied[i] = frame_wrenches[i] + step_wrenches[i];
+        }
+    }
+
     stepping = true;
     mj_step(model.get(), data.get());
     stepping = false;
+    std::fill(step_wrenches.begin(), step_wrenches.end(), 0.0);
 }
 
 void MujocoWorld::reset()
@@ -277,6 +319,8 @@ void MujocoWorld::reset()
     ERR_FAIL_COND_MSG(!model || !data, "Nothing to reset: the model has not compiled.");
     mj_resetData(model.get(), data.get());
     step_accumulator = 0.0;
+    std::fill(frame_wrenches.begin(), frame_wrenches.end(), 0.0);
+    std::fill(step_wrenches.begin(), step_wrenches.end(), 0.0);
     state_changed();
 }
 
@@ -289,10 +333,7 @@ void MujocoWorld::step(int p_count)
     for (int i = 0; i < p_count; i++) {
         step_once();
     }
-    if (model && data) {
-        mj_kinematics(model.get(), data.get());
-        sync_bodies();
-    }
+    end_frame();
 }
 
 mjModel *MujocoWorld::get_model()
@@ -323,6 +364,33 @@ void MujocoWorld::state_changed()
     }
 }
 
+void MujocoWorld::add_body_wrench(int p_body_id, const mjtNum p_force[3], const mjtNum p_torque[3])
+{
+    ERR_FAIL_COND(!model || p_body_id < 1 || p_body_id >= model->nbody);
+    std::vector<mjtNum> &wrenches = in_pre_step ? step_wrenches : frame_wrenches;
+    ERR_FAIL_COND(wrenches.size() != static_cast<size_t>(6 * model->nbody));
+    mjtNum *wrench = wrenches.data() + 6 * p_body_id;
+    for (int i = 0; i < 3; i++) {
+        wrench[i] += p_force[i];
+        wrench[3 + i] += p_torque[i];
+    }
+}
+
+void MujocoWorld::global_to_mujoco_vector(const Vector3 &p_vector, mjtNum r_out[3]) const
+{
+    mujoco_convert::to_mujoco(get_global_basis().orthonormalized().xform_inv(p_vector), r_out);
+}
+
+Vector3 MujocoWorld::mujoco_to_global_vector(const mjtNum p_vector[3]) const
+{
+    return get_global_basis().orthonormalized().xform(mujoco_convert::to_godot(p_vector));
+}
+
+void MujocoWorld::global_to_mujoco_transform(const Transform3D &p_transform, mjtNum r_pos[3], mjtNum r_quat[4]) const
+{
+    mujoco_convert::to_mujoco(get_global_transform().affine_inverse() * p_transform, r_pos, r_quat);
+}
+
 void MujocoWorld::sync_bodies()
 {
     if (!model || !data) {
@@ -332,7 +400,8 @@ void MujocoWorld::sync_bodies()
     // Body ids are in tree order, so each parent is placed before its children.
     for (int id = 1; id < model->nbody && id < static_cast<int>(body_nodes.size()); id++) {
         Node3D *node = Object::cast_to<Node3D>(ObjectDB::get_instance(body_nodes[static_cast<size_t>(id)]));
-        if (!node) {
+        // Mocap bodies are driven by their nodes, not the other way round.
+        if (!node || model->body_mocapid[id] >= 0) {
             continue;
         }
         node->set_global_transform(world_transform * mujoco_convert::to_godot(data->xpos + 3 * id, data->xquat + 4 * id));

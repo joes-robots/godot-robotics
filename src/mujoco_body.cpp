@@ -1,5 +1,7 @@
 #include "mujoco_body.h"
 #include "mujoco_convert.h"
+#include "mujoco_joint.h"
+#include "mujoco_world.h"
 
 #include <godot_cpp/classes/engine.hpp>
 
@@ -10,6 +12,7 @@ mjsBody *MujocoBody::add_to_spec(mjSpec * /*p_spec*/, mjsBody *p_body, const Tra
     mjsBody *body = mjs_addBody(p_body, nullptr);
     mjs_setName(body->element, p_name.utf8().get_data());
     mujoco_convert::to_mujoco(p_transform, body->pos, body->quat);
+    body->mocap = mocap ? 1 : 0;
     return body;
 }
 
@@ -27,10 +30,191 @@ Transform3D MujocoBody::get_model_transform()
     return rest_transform;
 }
 
+PackedStringArray MujocoBody::_get_configuration_warnings() const
+{
+    PackedStringArray warnings = MujocoElement::_get_configuration_warnings();
+    if (!mocap) {
+        return warnings;
+    }
+    const MujocoWorld *world = get_world();
+    for (const Node *node = get_parent(); node && node != world; node = node->get_parent()) {
+        if (Object::cast_to<MujocoBody>(node)) {
+            warnings.push_back("A mocap body must not be inside another MujocoBody.");
+            break;
+        }
+    }
+    for (int i = 0; i < get_child_count(); i++) {
+        if (Object::cast_to<MujocoJoint>(get_child(i))) {
+            warnings.push_back("A mocap body cannot have joints; scripts move it directly.");
+            break;
+        }
+    }
+    return warnings;
+}
+
 void MujocoBody::_notification(int p_what)
 {
     if (p_what == NOTIFICATION_EXIT_TREE) {
         // A new parent means a new reference frame; capture again next time.
         has_rest_transform = false;
     }
+}
+
+void MujocoBody::set_mocap(bool p_mocap)
+{
+    mocap = p_mocap;
+    update_configuration_warnings();
+    request_compile();
+}
+
+bool MujocoBody::is_mocap() const
+{
+    return mocap;
+}
+
+int MujocoBody::get_body_id(const char *p_action)
+{
+    const int id = get_model_id(mjOBJ_BODY);
+    ERR_FAIL_COND_V_MSG(id < 0, -1, vformat("Cannot %s: this body is not part of a compiled MuJoCo model.", p_action));
+    return id;
+}
+
+Vector3 MujocoBody::get_linear_velocity()
+{
+    const int id = get_body_id("read the velocity");
+    if (id < 0) {
+        return Vector3();
+    }
+    MujocoWorld *world = get_world();
+    mjtNum velocity[6]; // angular, then linear
+    // XBODY: at the body's origin (BODY would be at its center of mass).
+    mj_objectVelocity(world->get_model(), world->get_data(), mjOBJ_XBODY, id, velocity, 0);
+    return world->mujoco_to_global_vector(velocity + 3);
+}
+
+Vector3 MujocoBody::get_angular_velocity()
+{
+    const int id = get_body_id("read the velocity");
+    if (id < 0) {
+        return Vector3();
+    }
+    MujocoWorld *world = get_world();
+    mjtNum velocity[6];
+    mj_objectVelocity(world->get_model(), world->get_data(), mjOBJ_XBODY, id, velocity, 0);
+    return world->mujoco_to_global_vector(velocity);
+}
+
+bool MujocoBody::get_free_joint_index(int &r_qpos, int &r_dof)
+{
+    ERR_FAIL_COND_V_MSG(Engine::get_singleton()->is_editor_hint(), false, "Body state can only be set while the game runs.");
+    const int id = get_body_id("set the state");
+    if (id < 0) {
+        return false;
+    }
+    const mjModel *model = get_world()->get_model();
+    const int joint = model->body_jntadr[id];
+    ERR_FAIL_COND_V_MSG(model->body_jntnum[id] != 1 || model->jnt_type[joint] != mjJNT_FREE, false,
+            "Setting a body's pose or velocity needs a free joint as its only joint. Use the joint's own methods otherwise.");
+    r_qpos = model->jnt_qposadr[joint];
+    r_dof = model->jnt_dofadr[joint];
+    return true;
+}
+
+void MujocoBody::set_linear_velocity(const Vector3 &p_velocity)
+{
+    int qpos = 0, dof = 0;
+    if (!get_free_joint_index(qpos, dof)) {
+        return;
+    }
+    MujocoWorld *world = get_world();
+    // A free joint's linear velocity is that of the body's origin, in the world frame.
+    world->global_to_mujoco_vector(p_velocity, world->get_data()->qvel + dof);
+    world->state_changed();
+}
+
+void MujocoBody::set_angular_velocity(const Vector3 &p_velocity)
+{
+    int qpos = 0, dof = 0;
+    if (!get_free_joint_index(qpos, dof)) {
+        return;
+    }
+    MujocoWorld *world = get_world();
+    mjData *data = world->get_data();
+    // A free joint's angular velocity is in the body's local frame.
+    mjtNum world_velocity[3];
+    world->global_to_mujoco_vector(p_velocity, world_velocity);
+    mju_mulMatTVec3(data->qvel + dof + 3, data->xmat + 9 * get_model_id(mjOBJ_BODY), world_velocity);
+    world->state_changed();
+}
+
+void MujocoBody::teleport(const Transform3D &p_transform)
+{
+    int qpos = 0, dof = 0;
+    if (!get_free_joint_index(qpos, dof)) {
+        return;
+    }
+    MujocoWorld *world = get_world();
+    mjData *data = world->get_data();
+    // A free joint's position is the body's position and orientation in the world frame.
+    world->global_to_mujoco_transform(p_transform, data->qpos + qpos, data->qpos + qpos + 3);
+    world->state_changed();
+}
+
+void MujocoBody::add_wrench(const Vector3 &p_force, const Vector3 *p_position, const Vector3 &p_torque)
+{
+    ERR_FAIL_COND_MSG(Engine::get_singleton()->is_editor_hint(), "Forces can only be applied while the game runs.");
+    const int id = get_body_id("apply a force");
+    if (id < 0) {
+        return;
+    }
+    MujocoWorld *world = get_world();
+    const mjData *data = world->get_data();
+
+    mjtNum force[3], torque[3];
+    world->global_to_mujoco_vector(p_force, force);
+    world->global_to_mujoco_vector(p_torque, torque);
+    if (p_position) {
+        // MuJoCo applies the force at the center of mass; a force elsewhere adds torque r x F.
+        mjtNum offset[3], arm[3], extra[3];
+        world->global_to_mujoco_vector(*p_position, offset);
+        for (int i = 0; i < 3; i++) {
+            arm[i] = data->xpos[3 * id + i] + offset[i] - data->xipos[3 * id + i];
+        }
+        mju_cross(extra, arm, force);
+        for (int i = 0; i < 3; i++) {
+            torque[i] += extra[i];
+        }
+    }
+    world->add_body_wrench(id, force, torque);
+}
+
+void MujocoBody::apply_force(const Vector3 &p_force, const Vector3 &p_position)
+{
+    add_wrench(p_force, &p_position, Vector3());
+}
+
+void MujocoBody::apply_central_force(const Vector3 &p_force)
+{
+    add_wrench(p_force, nullptr, Vector3());
+}
+
+void MujocoBody::apply_torque(const Vector3 &p_torque)
+{
+    add_wrench(Vector3(), nullptr, p_torque);
+}
+
+void MujocoBody::_bind_methods()
+{
+    ClassDB::bind_method(D_METHOD("set_mocap", "mocap"), &MujocoBody::set_mocap);
+    ClassDB::bind_method(D_METHOD("is_mocap"), &MujocoBody::is_mocap);
+    ClassDB::bind_method(D_METHOD("get_linear_velocity"), &MujocoBody::get_linear_velocity);
+    ClassDB::bind_method(D_METHOD("get_angular_velocity"), &MujocoBody::get_angular_velocity);
+    ClassDB::bind_method(D_METHOD("set_linear_velocity", "velocity"), &MujocoBody::set_linear_velocity);
+    ClassDB::bind_method(D_METHOD("set_angular_velocity", "velocity"), &MujocoBody::set_angular_velocity);
+    ClassDB::bind_method(D_METHOD("teleport", "transform"), &MujocoBody::teleport);
+    ClassDB::bind_method(D_METHOD("apply_force", "force", "position"), &MujocoBody::apply_force, DEFVAL(Vector3()));
+    ClassDB::bind_method(D_METHOD("apply_central_force", "force"), &MujocoBody::apply_central_force);
+    ClassDB::bind_method(D_METHOD("apply_torque", "torque"), &MujocoBody::apply_torque);
+
+    ADD_PROPERTY(PropertyInfo(Variant::BOOL, "mocap"), "set_mocap", "is_mocap");
 }

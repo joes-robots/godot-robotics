@@ -66,6 +66,16 @@ public:
     // Call after writing simulation state (qpos, qvel) outside of stepping:
     // updates the derived quantities and, while the game runs, the body nodes.
     void state_changed();
+    // Adds a force and a torque about the body's center of mass, both in this world's
+    // MuJoCo frame. They act during every step of the next physics frame, or only the
+    // next step when called from a pre_step handler.
+    void add_body_wrench(int p_body_id, const mjtNum p_force[3], const mjtNum p_torque[3]);
+
+    // Conversions between global Godot coordinates and this world's MuJoCo frame
+    // (which is the world node's frame, Z-up). Vectors ignore the node's scale.
+    void global_to_mujoco_vector(const godot::Vector3 &p_vector, mjtNum r_out[3]) const;
+    godot::Vector3 mujoco_to_global_vector(const mjtNum p_vector[3]) const;
+    void global_to_mujoco_transform(const godot::Transform3D &p_transform, mjtNum r_pos[3], mjtNum r_quat[4]) const;
 
 protected:
     // Godot built-ins
@@ -91,6 +101,9 @@ private:
     void step_simulation(double p_delta);
     // One MuJoCo step, preceded by the pre_step signal.
     void step_once();
+    // After a frame's steps: clears that frame's forces, brings the derived
+    // quantities (poses, velocities) up to date and moves the body nodes.
+    void end_frame();
     // Writes the simulated body poses into the MujocoBody nodes.
     void sync_bodies();
     void report_compile_error(const godot::String &p_error);
@@ -115,6 +128,14 @@ private:
     double step_accumulator = 0.0;
     // Inside step_once(); mj_step recomputes everything, so state_changed() can skip work.
     bool stepping = false;
+    // Emitting pre_step; forces added now act for one step only.
+    bool in_pre_step = false;
+    // Applied forces (6 per body: force, then torque; MuJoCo's xfrc_applied layout),
+    // for the next frame and for the next step.
+    std::vector<mjtNum> frame_wrenches;
+    std::vector<mjtNum> step_wrenches;
+    // Ids of mocap bodies, whose nodes drive the simulation instead of following it.
+    std::vector<int> mocap_bodies;
     // See get_model_generation(); 0 means nothing has compiled yet.
     uint64_t model_generation = 0;
 
