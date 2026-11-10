@@ -106,6 +106,8 @@ private:
     void end_frame();
     // Writes the simulated body poses into the MujocoBody nodes.
     void sync_bodies();
+    // Copies each MujocoActuator's ctrl into p_data (which mj_makeData and mj_resetData zero).
+    void write_controls(const mjModel *p_model, mjData *p_data) const;
     void report_compile_error(const godot::String &p_error);
     void clear_compile_error();
 
@@ -143,6 +145,10 @@ private:
     std::vector<std::pair<mjsBody *, uint64_t>> building_bodies;
     // Node instance id for each body id of the current model (0 for the world body).
     std::vector<uint64_t> body_nodes;
+    // Actuator nodes collected while building a spec (instance ids), then for each
+    // actuator id of the current model.
+    std::vector<uint64_t> building_actuators;
+    std::vector<uint64_t> actuator_nodes;
 
     // The spec, model and data from the last successful compile.
     std::unique_ptr<mjSpec, MjSpecDeleter> spec;

@@ -7,6 +7,7 @@
 #include <godot_cpp/godot.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
+#include "mujoco_actuator.h"
 #include "mujoco_body.h"
 #include "mujoco_editor_plugin.h"
 #include "mujoco_element.h"
@@ -66,6 +67,7 @@ void initialize_gdextension_types(ModuleInitializationLevel p_level)
 	GDREGISTER_CLASS(MujocoBody);
 	GDREGISTER_CLASS(MujocoGeom);
 	GDREGISTER_CLASS(MujocoJoint);
+	GDREGISTER_CLASS(MujocoActuator);
 }
 
 void uninitialize_gdextension_types(ModuleInitializationLevel p_level) {

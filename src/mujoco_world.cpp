@@ -1,4 +1,5 @@
 #include "mujoco_world.h"
+#include "mujoco_actuator.h"
 #include "mujoco_element.h"
 #include "mujoco_options.h"
 
@@ -154,6 +155,7 @@ void MujocoWorld::compile()
     // Angles (joint ranges) are given in radians, like everywhere in Godot's API.
     new_spec->compiler.degree = 0;
     building_bodies.clear();
+    building_actuators.clear();
     add_subtree(this, new_spec.get(), mjs_findBody(new_spec.get(), "world"), Transform3D());
 
     std::unique_ptr<mjModel, MjModelDeleter> new_model(mj_compile(new_spec.get(), nullptr));
@@ -177,7 +179,20 @@ void MujocoWorld::compile()
     }
     building_bodies.clear();
 
-    // Compute body poses for the initial state.
+    // Map actuator ids to nodes. Actuators with a bad target were left out (id -1).
+    std::vector<uint64_t> new_actuator_nodes(static_cast<size_t>(new_model->nu), 0);
+    for (uint64_t node_id : building_actuators) {
+        Node *node = Object::cast_to<Node>(ObjectDB::get_instance(node_id));
+        const int id = node ? mj_name2id(new_model.get(), mjOBJ_ACTUATOR, String(get_path_to(node)).utf8().get_data()) : -1;
+        if (id >= 0 && id < new_model->nu) {
+            new_actuator_nodes[static_cast<size_t>(id)] = node_id;
+        }
+    }
+    building_actuators.clear();
+    actuator_nodes = std::move(new_actuator_nodes);
+    write_controls(new_model.get(), new_data.get());
+
+    // Compute body poses (and actuator forces) for the initial state.
     mj_forward(new_model.get(), new_data.get());
 
     // Release the old data before the model it was made from.
@@ -228,6 +243,9 @@ void MujocoWorld::add_subtree(Node *p_node, mjSpec *p_spec, mjsBody *p_body, con
         mjsBody *child_body = element->add_to_spec(p_spec, p_body, to_body, name);
         if (child_body != p_body) {
             building_bodies.emplace_back(child_body, child->get_instance_id());
+        }
+        if (Object::cast_to<MujocoActuator>(child)) {
+            building_actuators.push_back(child->get_instance_id());
         }
         // A new body starts a new frame for its descendants.
         add_subtree(child, p_spec, child_body, child_body == p_body ? to_body : Transform3D());
@@ -318,6 +336,7 @@ void MujocoWorld::reset()
     flush_compile();
     ERR_FAIL_COND_MSG(!model || !data, "Nothing to reset: the model has not compiled.");
     mj_resetData(model.get(), data.get());
+    write_controls(model.get(), data.get());
     step_accumulator = 0.0;
     std::fill(frame_wrenches.begin(), frame_wrenches.end(), 0.0);
     std::fill(step_wrenches.begin(), step_wrenches.end(), 0.0);
@@ -405,6 +424,14 @@ void MujocoWorld::sync_bodies()
             continue;
         }
         node->set_global_transform(world_transform * mujoco_convert::to_godot(data->xpos + 3 * id, data->xquat + 4 * id));
+    }
+}
+
+void MujocoWorld::write_controls(const mjModel *p_model, mjData *p_data) const
+{
+    for (int id = 0; id < p_model->nu && id < static_cast<int>(actuator_nodes.size()); id++) {
+        const MujocoActuator *actuator = Object::cast_to<MujocoActuator>(ObjectDB::get_instance(actuator_nodes[static_cast<size_t>(id)]));
+        p_data->ctrl[id] = actuator ? actuator->get_ctrl() : 0.0;
     }
 }
 
