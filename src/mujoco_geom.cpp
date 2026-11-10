@@ -2,6 +2,7 @@
 #include "mujoco_convert.h"
 
 #include <algorithm>
+#include <limits>
 
 #include <godot_cpp/classes/array_mesh.hpp>
 #include <godot_cpp/classes/box_mesh.hpp>
@@ -88,40 +89,46 @@ MujocoGeom::MujocoGeom()
     update_shape_mesh();
 }
 
-mjsBody *MujocoGeom::add_to_spec(mjSpec * /*p_spec*/, mjsBody *p_body, const Transform3D &p_transform, const String &p_name)
+mjsBody *MujocoGeom::add_to_spec(mjSpec *p_spec, mjsBody *p_body, const Transform3D &p_transform, const String &p_name)
 {
-    mjsGeom *geom = mjs_addGeom(p_body, nullptr);
+    mjsGeom *geom = mjs_addGeom(p_body, get_spec_default(p_spec));
     mjs_setName(geom->element, p_name.utf8().get_data());
-    const Shape shape = get_shape();
-    geom->type = static_cast<mjtGeom>(shape);
+    write_attributes(geom);
     mujoco_convert::to_mujoco(p_transform, geom->pos, geom->quat);
-
-    get_half_size(geom->size);
-    // Clear the parameters the shape doesn't use, so the MJCF stays tidy.
-    if (shape == SHAPE_SPHERE) {
-        geom->size[1] = geom->size[2] = 0.0;
-    } else if (shape == SHAPE_CAPSULE || shape == SHAPE_CYLINDER) {
-        geom->size[2] = 0.0;
-    }
-
-    geom->density = get_density();
-    const double mass = get_mass();
-    if (mass > 0.0) {
-        geom->mass = mass; // otherwise left unset (NaN), so MuJoCo uses density
-    }
-    const Vector3 friction = get_friction();
-    geom->friction[0] = friction.x;
-    geom->friction[1] = friction.y;
-    geom->friction[2] = friction.z;
-    geom->contype = static_cast<int>(get_collision_layer());
-    geom->conaffinity = static_cast<int>(get_collision_mask());
-    const Color color = get_color();
-    geom->rgba[0] = color.r;
-    geom->rgba[1] = color.g;
-    geom->rgba[2] = color.b;
-    geom->rgba[3] = color.a;
-
     return p_body;
+}
+
+void MujocoGeom::write_attributes(mjsGeom *p_geom) const
+{
+    p_geom->type = static_cast<mjtGeom>(get_shape());
+    get_half_size(p_geom->size);
+    p_geom->density = get_density();
+    // Mass 0 means "from density", which MuJoCo marks with NaN.
+    const double mass = get_mass();
+    p_geom->mass = mass > 0.0 ? mass : std::numeric_limits<double>::quiet_NaN();
+    const Vector3 friction = get_friction();
+    p_geom->friction[0] = friction.x;
+    p_geom->friction[1] = friction.y;
+    p_geom->friction[2] = friction.z;
+    p_geom->contype = static_cast<int>(get_collision_layer());
+    p_geom->conaffinity = static_cast<int>(get_collision_mask());
+    const Color color = get_color();
+    p_geom->rgba[0] = color.r;
+    p_geom->rgba[1] = color.g;
+    p_geom->rgba[2] = color.b;
+    p_geom->rgba[3] = color.a;
+}
+
+void MujocoGeom::write_class_defaults(mjsDefault *p_default)
+{
+    write_attributes(p_default->geom);
+}
+
+void MujocoGeom::inherited_changed()
+{
+    MujocoElement::inherited_changed();
+    // The drawn shape may be inherited.
+    update_shape_mesh();
 }
 
 PackedStringArray MujocoGeom::_get_configuration_warnings() const

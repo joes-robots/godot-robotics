@@ -9,6 +9,7 @@
 
 #include "mujoco_actuator.h"
 #include "mujoco_body.h"
+#include "mujoco_default.h"
 #include "mujoco_editor_plugin.h"
 #include "mujoco_element.h"
 #include "mujoco_geom.h"
@@ -66,6 +67,7 @@ void initialize_gdextension_types(ModuleInitializationLevel p_level)
 	}
 	previous_mujoco_log_handler = mju_setLogHandler(mujoco_log_handler);
 	GDREGISTER_CLASS(MujocoWorld);
+	GDREGISTER_CLASS(MujocoDefault);
 	GDREGISTER_ABSTRACT_CLASS(MujocoElement);
 	GDREGISTER_CLASS(MujocoBody);
 	GDREGISTER_CLASS(MujocoGeom);

@@ -13,7 +13,35 @@ mjsBody *MujocoBody::add_to_spec(mjSpec * /*p_spec*/, mjsBody *p_body, const Tra
     mjs_setName(body->element, p_name.utf8().get_data());
     mujoco_convert::to_mujoco(p_transform, body->pos, body->quat);
     body->mocap = mocap ? 1 : 0;
+    // Only for the MJCF: elements already name their resolved classes.
+    if (!child_class.is_empty()) {
+        mjs_setString(body->childclass, String(child_class).utf8().get_data());
+    }
     return body;
+}
+
+void MujocoBody::set_child_class(const StringName &p_class)
+{
+    child_class = p_class;
+    update_configuration_warnings();
+    if (MujocoWorld *world = get_world()) {
+        world->default_classes_changed();
+    }
+}
+
+StringName MujocoBody::get_child_class() const
+{
+    return child_class;
+}
+
+void MujocoBody::_validate_property(PropertyInfo &p_property) const
+{
+    if (p_property.name == StringName("child_class")) {
+        if (const MujocoWorld *world = get_world()) {
+            p_property.hint = PROPERTY_HINT_ENUM_SUGGESTION;
+            p_property.hint_string = String(",").join(world->get_default_class_names());
+        }
+    }
 }
 
 Transform3D MujocoBody::get_model_transform()
@@ -33,10 +61,13 @@ Transform3D MujocoBody::get_model_transform()
 PackedStringArray MujocoBody::_get_configuration_warnings() const
 {
     PackedStringArray warnings = MujocoElement::_get_configuration_warnings();
+    const MujocoWorld *world = get_world();
+    if (world && !child_class.is_empty() && !world->find_default_class(child_class)) {
+        warnings.push_back(vformat("There is no default class \"%s\" in this world.", child_class));
+    }
     if (!mocap) {
         return warnings;
     }
-    const MujocoWorld *world = get_world();
     for (const Node *node = get_parent(); node && node != world; node = node->get_parent()) {
         if (Object::cast_to<MujocoBody>(node)) {
             warnings.push_back("A mocap body must not be inside another MujocoBody.");
@@ -216,5 +247,8 @@ void MujocoBody::_bind_methods()
     ClassDB::bind_method(D_METHOD("apply_central_force", "force"), &MujocoBody::apply_central_force);
     ClassDB::bind_method(D_METHOD("apply_torque", "torque"), &MujocoBody::apply_torque);
 
+    ClassDB::bind_method(D_METHOD("set_child_class", "class"), &MujocoBody::set_child_class);
+    ClassDB::bind_method(D_METHOD("get_child_class"), &MujocoBody::get_child_class);
     ADD_PROPERTY(PropertyInfo(Variant::BOOL, "mocap"), "set_mocap", "is_mocap");
+    ADD_PROPERTY(PropertyInfo(Variant::STRING_NAME, "child_class"), "set_child_class", "get_child_class");
 }

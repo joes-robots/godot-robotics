@@ -30,6 +30,8 @@ public:
     };
 
     mjsBody *add_to_spec(mjSpec *p_spec, mjsBody *p_body, const godot::Transform3D &p_transform, const godot::String &p_name) override;
+    const char *get_class_section() const override { return "actuator"; }
+    void write_class_defaults(mjsDefault *p_default) override;
     godot::PackedStringArray _get_configuration_warnings() const override;
 
     void set_type(Type p_type);
@@ -71,6 +73,9 @@ protected:
 
 private:
     void changed();
+    // Writes gear and the control and force ranges into p_actuator. (Gains depend
+    // on the type, which is the actuator's own; classes don't write them.)
+    void write_ranges(mjsActuator *p_actuator) const;
     // Writes ctrl into the simulation, if this actuator is part of a compiled model.
     void write_ctrl();
 

@@ -54,20 +54,30 @@ void MujocoSite::get_half_size(double r_half[3]) const
     r_half[2] = get_attribute("size2");
 }
 
-mjsBody *MujocoSite::add_to_spec(mjSpec * /*p_spec*/, mjsBody *p_body, const Transform3D &p_transform, const String &p_name)
+mjsBody *MujocoSite::add_to_spec(mjSpec *p_spec, mjsBody *p_body, const Transform3D &p_transform, const String &p_name)
 {
-    mjsSite *site = mjs_addSite(p_body, nullptr);
+    mjsSite *site = mjs_addSite(p_body, get_spec_default(p_spec));
     mjs_setName(site->element, p_name.utf8().get_data());
-    const MujocoGeom::Shape shape = get_shape();
-    site->type = static_cast<mjtGeom>(shape);
+    write_attributes(site);
     mujoco_convert::to_mujoco(p_transform, site->pos, site->quat);
-    get_half_size(site->size);
-    if (shape == MujocoGeom::SHAPE_SPHERE) {
-        site->size[1] = site->size[2] = 0.0;
-    } else if (shape == MujocoGeom::SHAPE_CAPSULE || shape == MujocoGeom::SHAPE_CYLINDER) {
-        site->size[2] = 0.0;
-    }
     return p_body;
+}
+
+void MujocoSite::write_attributes(mjsSite *p_site) const
+{
+    p_site->type = static_cast<mjtGeom>(get_shape());
+    get_half_size(p_site->size);
+}
+
+void MujocoSite::write_class_defaults(mjsDefault *p_default)
+{
+    write_attributes(p_default->site);
+}
+
+void MujocoSite::inherited_changed()
+{
+    MujocoElement::inherited_changed();
+    update_gizmos();
 }
 
 Ref<Mesh> MujocoSite::get_shape_mesh() const

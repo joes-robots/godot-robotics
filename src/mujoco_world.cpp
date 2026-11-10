@@ -1,5 +1,6 @@
 #include "mujoco_world.h"
 #include "mujoco_actuator.h"
+#include "mujoco_default.h"
 #include "mujoco_element.h"
 #include "mujoco_options.h"
 
@@ -155,6 +156,19 @@ void MujocoWorld::compile()
     new_spec->option = option;
     // Angles (joint ranges) are given in radians, like everywhere in Godot's API.
     new_spec->compiler.degree = 0;
+    // Default classes first: elements are created with theirs. The root class gets
+    // the base defaults (with main's overrides, if there is a main class).
+    mjsDefault *main_default = mjs_getSpecDefault(new_spec.get());
+    if (const MujocoDefault *main = get_main_class()) {
+        main->write_to_spec(main_default);
+    } else {
+        // An unattached class with no overrides holds exactly the base defaults.
+        MujocoDefault *base = memnew(MujocoDefault);
+        base->write_to_spec(main_default);
+        memdelete(base);
+    }
+    add_default_classes(this, new_spec.get(), main_default);
+
     building_bodies.clear();
     building_actuators.clear();
     add_subtree(this, new_spec.get(), mjs_findBody(new_spec.get(), "world"), Transform3D());
@@ -251,6 +265,108 @@ void MujocoWorld::add_subtree(Node *p_node, mjSpec *p_spec, mjsBody *p_body, con
         // A new body starts a new frame for its descendants.
         add_subtree(child, p_spec, child_body, child_body == p_body ? to_body : Transform3D());
     }
+}
+
+void MujocoWorld::add_default_classes(Node *p_node, mjSpec *p_spec, mjsDefault *p_parent)
+{
+    const int count = p_node->get_child_count();
+    for (int i = 0; i < count; i++) {
+        MujocoDefault *cls = Object::cast_to<MujocoDefault>(p_node->get_child(i));
+        if (!cls) {
+            continue;
+        }
+        if (cls->is_main()) {
+            // Already written into the spec's root class; its children are top-level classes.
+            add_default_classes(cls, p_spec, p_parent);
+            continue;
+        }
+        mjsDefault *def = mjs_addDefault(p_spec, String(cls->get_name()).utf8().get_data(), p_parent);
+        if (!def) {
+            // A duplicate name (shown as a configuration warning): skip this class.
+            continue;
+        }
+        cls->write_to_spec(def);
+        add_default_classes(cls, p_spec, def);
+    }
+}
+
+static MujocoDefault *find_class_in(Node *p_node, const StringName &p_name)
+{
+    const int count = p_node->get_child_count();
+    for (int i = 0; i < count; i++) {
+        MujocoDefault *cls = Object::cast_to<MujocoDefault>(p_node->get_child(i));
+        if (!cls) {
+            continue;
+        }
+        if (cls->get_name() == p_name) {
+            return cls;
+        }
+        if (MujocoDefault *found = find_class_in(cls, p_name)) {
+            return found;
+        }
+    }
+    return nullptr;
+}
+
+static void collect_class_names(Node *p_node, PackedStringArray &r_names)
+{
+    const int count = p_node->get_child_count();
+    for (int i = 0; i < count; i++) {
+        if (MujocoDefault *cls = Object::cast_to<MujocoDefault>(p_node->get_child(i))) {
+            r_names.push_back(cls->get_name());
+            collect_class_names(cls, r_names);
+        }
+    }
+}
+
+MujocoDefault *MujocoWorld::find_default_class(const StringName &p_name) const
+{
+    return find_class_in(const_cast<MujocoWorld *>(this), p_name);
+}
+
+MujocoDefault *MujocoWorld::get_main_class() const
+{
+    MujocoDefault *main = find_default_class("main");
+    return main && main->is_main() ? main : nullptr;
+}
+
+PackedStringArray MujocoWorld::get_default_class_names() const
+{
+    PackedStringArray names;
+    collect_class_names(const_cast<MujocoWorld *>(this), names);
+    return names;
+}
+
+void MujocoWorld::default_classes_changed()
+{
+    request_compile();
+    if (refresh_queued) {
+        return;
+    }
+    refresh_queued = true;
+    callable_mp(this, &MujocoWorld::refresh_inherited).call_deferred();
+}
+
+static void refresh_subtree(Node *p_node)
+{
+    const int count = p_node->get_child_count();
+    for (int i = 0; i < count; i++) {
+        Node *child = p_node->get_child(i);
+        // Nested worlds have their own classes.
+        if (Object::cast_to<MujocoWorld>(child)) {
+            continue;
+        }
+        if (MujocoElement *element = Object::cast_to<MujocoElement>(child)) {
+            element->inherited_changed();
+        }
+        refresh_subtree(child);
+    }
+}
+
+void MujocoWorld::refresh_inherited()
+{
+    refresh_queued = false;
+    refresh_subtree(this);
 }
 
 void MujocoWorld::step_simulation(double p_delta)

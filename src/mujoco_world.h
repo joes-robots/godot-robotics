@@ -28,6 +28,8 @@ struct MjDataDeleter {
 // While the game runs (never in the editor), the world steps the simulation in
 // _physics_process and writes each body's simulated pose into its MujocoBody.
 // Option changes at runtime are applied to the running model without a reset.
+class MujocoDefault;
+
 class MujocoWorld : public godot::Node3D {
     GDCLASS(MujocoWorld, godot::Node3D);
 
@@ -71,6 +73,17 @@ public:
     // next step when called from a pre_step handler.
     void add_body_wrench(int p_body_id, const mjtNum p_force[3], const mjtNum p_torque[3]);
 
+    // Default classes (MujocoDefault nodes under this world).
+    // The class named p_name, or nullptr.
+    MujocoDefault *find_default_class(const godot::StringName &p_name) const;
+    // The top-level class named "main", or nullptr (then elements without a
+    // class use the base defaults).
+    MujocoDefault *get_main_class() const;
+    godot::PackedStringArray get_default_class_names() const;
+    // Call when a class, or which class elements use, changes: recompiles and,
+    // once per frame, lets every element refresh what it inherits.
+    void default_classes_changed();
+
     // Conversions between global Godot coordinates and this world's MuJoCo frame
     // (which is the world node's frame, Z-up). Vectors ignore the node's scale.
     void global_to_mujoco_vector(const godot::Vector3 &p_vector, mjtNum r_out[3]) const;
@@ -97,6 +110,11 @@ private:
     // Adds the MujocoElements under p_node to p_spec. p_body is the body they belong to and
     // p_to_body the transform from p_node's frame to p_body's frame (Godot coordinates).
     void add_subtree(godot::Node *p_node, mjSpec *p_spec, mjsBody *p_body, const godot::Transform3D &p_to_body);
+    // Adds the classes under p_node (the world or a class) to p_spec, with
+    // p_parent as their parent class.
+    void add_default_classes(godot::Node *p_node, mjSpec *p_spec, mjsDefault *p_parent);
+    // Calls inherited_changed() on every element (deferred from default_classes_changed()).
+    void refresh_inherited();
     // Advances the simulation by p_delta seconds of game time.
     void step_simulation(double p_delta);
     // One MuJoCo step, preceded by the pre_step signal.
@@ -115,6 +133,8 @@ private:
     bool initialized = false;
     // A deferred compile is pending (see request_compile()).
     bool compile_queued = false;
+    // A deferred refresh_inherited() is pending.
+    bool refresh_queued = false;
     // Last compile error, shown as a configuration warning in the editor.
     godot::String compile_error;
 

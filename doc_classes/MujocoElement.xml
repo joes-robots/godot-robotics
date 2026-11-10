@@ -6,7 +6,16 @@
 	</description>
 	<tutorials>
 	</tutorials>
+	<methods>
+		<method name="get_used_class" qualifiers="const">
+			<return type="MujocoDefault" />
+			<description>
+			</description>
+		</method>
+	</methods>
 	<members>
+		<member name="default_class" type="StringName" setter="set_default_class" getter="get_default_class" default="&amp;&quot;&quot;">
+		</member>
 		<member name="overrides" type="Dictionary" setter="set_overrides" getter="get_overrides" default="{}">
 		</member>
 	</members>

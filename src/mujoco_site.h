@@ -15,6 +15,9 @@ class MujocoSite : public MujocoElement {
 
 public:
     mjsBody *add_to_spec(mjSpec *p_spec, mjsBody *p_body, const godot::Transform3D &p_transform, const godot::String &p_name) override;
+    const char *get_class_section() const override { return "site"; }
+    void write_class_defaults(mjsDefault *p_default) override;
+    void inherited_changed() override;
 
     void set_shape(MujocoGeom::Shape p_shape);
     MujocoGeom::Shape get_shape() const;
@@ -38,6 +41,7 @@ protected:
 private:
     void changed();
     void get_half_size(double r_half[3]) const;
+    void write_attributes(mjsSite *p_site) const;
 
     // Attributes (see mujoco_element.h): shape; size0, size1, size2 (MuJoCo's size
     // parameters).

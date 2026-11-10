@@ -33,35 +33,51 @@ void MujocoJoint::overrides_changed()
     changed();
 }
 
-mjsBody *MujocoJoint::add_to_spec(mjSpec * /*p_spec*/, mjsBody *p_body, const Transform3D &p_transform, const String &p_name)
+mjsBody *MujocoJoint::add_to_spec(mjSpec *p_spec, mjsBody *p_body, const Transform3D &p_transform, const String &p_name)
 {
-    const Type type = get_type();
-    if (type == TYPE_FREE) {
-        // A free joint has no anchor or axis.
+    if (get_type() == TYPE_FREE) {
+        // A free joint has no anchor, axis, limits or spring.
         mjsJoint *joint = mjs_addFreeJoint(p_body);
         mjs_setName(joint->element, p_name.utf8().get_data());
+        mjs_setDefault(joint->element, get_spec_default(p_spec));
         return p_body;
     }
 
-    mjsJoint *joint = mjs_addJoint(p_body, nullptr);
+    mjsJoint *joint = mjs_addJoint(p_body, get_spec_default(p_spec));
     mjs_setName(joint->element, p_name.utf8().get_data());
-    joint->type = static_cast<mjtJoint>(type);
+    write_attributes(joint);
 
     mjtNum quat_unused[4];
     mujoco_convert::to_mujoco(p_transform, joint->pos, quat_unused);
     // The node's local Y axis, expressed in the body's frame.
     mujoco_convert::to_mujoco(p_transform.basis.xform(Vector3(0, 1, 0)).normalized(), joint->axis);
+    return p_body;
+}
 
+void MujocoJoint::write_attributes(mjsJoint *p_joint) const
+{
+    const Type type = get_type();
+    p_joint->type = static_cast<mjtJoint>(type);
     // The world's compiler takes radians, matching the range units.
     const Vector2 range = get_range();
-    joint->limited = is_limited() ? mjLIMITED_TRUE : mjLIMITED_FALSE;
-    joint->range[0] = type == TYPE_BALL ? 0.0 : range.x;
-    joint->range[1] = range.y;
-    joint->damping[0] = get_damping();
-    joint->stiffness[0] = get_stiffness();
-    joint->armature = get_armature();
-    joint->frictionloss = get_frictionloss();
-    return p_body;
+    p_joint->limited = is_limited() ? mjLIMITED_TRUE : mjLIMITED_FALSE;
+    p_joint->range[0] = type == TYPE_BALL ? 0.0 : range.x;
+    p_joint->range[1] = range.y;
+    p_joint->damping[0] = get_damping();
+    p_joint->stiffness[0] = get_stiffness();
+    p_joint->armature = get_armature();
+    p_joint->frictionloss = get_frictionloss();
+}
+
+void MujocoJoint::write_class_defaults(mjsDefault *p_default)
+{
+    write_attributes(p_default->joint);
+}
+
+void MujocoJoint::inherited_changed()
+{
+    MujocoElement::inherited_changed();
+    update_gizmos();
 }
 
 PackedStringArray MujocoJoint::_get_configuration_warnings() const

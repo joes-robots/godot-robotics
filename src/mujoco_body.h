@@ -24,6 +24,10 @@ public:
 
     void set_mocap(bool p_mocap);
     bool is_mocap() const;
+    // The default class for the elements inside this body (MJCF's childclass),
+    // unless they or a nearer body name one. Empty for none.
+    void set_child_class(const godot::StringName &p_class);
+    godot::StringName get_child_class() const;
 
     // Velocity of the body's origin, in global coordinates (zero for mocap bodies).
     godot::Vector3 get_linear_velocity();
@@ -45,6 +49,7 @@ public:
 protected:
     static void _bind_methods();
     void _notification(int p_what);
+    void _validate_property(godot::PropertyInfo &p_property) const;
 
 private:
     // This body's id in the compiled model, or -1 (with an error naming p_action).
@@ -55,6 +60,7 @@ private:
     void add_wrench(const godot::Vector3 &p_force, const godot::Vector3 *p_position, const godot::Vector3 &p_torque);
 
     bool mocap = false;
+    godot::StringName child_class;
     bool has_rest_transform = false;
     godot::Transform3D rest_transform;
 };

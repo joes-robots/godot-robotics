@@ -34,6 +34,9 @@ public:
     MujocoGeom();
 
     mjsBody *add_to_spec(mjSpec *p_spec, mjsBody *p_body, const godot::Transform3D &p_transform, const godot::String &p_name) override;
+    const char *get_class_section() const override { return "geom"; }
+    void write_class_defaults(mjsDefault *p_default) override;
+    void inherited_changed() override;
     godot::PackedStringArray _get_configuration_warnings() const override;
 
     void set_shape(Shape p_shape);
@@ -85,6 +88,8 @@ private:
     void update_shape_mesh();
     // MuJoCo's size parameters, as currently resolved.
     void get_half_size(double r_half[3]) const;
+    // Writes the class-able attributes (everything but the frame) into p_geom.
+    void write_attributes(mjsGeom *p_geom) const;
 
     // Attributes (see mujoco_element.h): shape; size0, size1, size2 (MuJoCo's size
     // parameters); density (kg/m^3, used when mass is 0); mass (kg); friction

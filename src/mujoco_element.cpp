@@ -1,4 +1,6 @@
 #include "mujoco_element.h"
+#include "mujoco_body.h"
+#include "mujoco_default.h"
 #include "mujoco_world.h"
 
 #include <godot_cpp/classes/engine.hpp>
@@ -27,6 +29,11 @@ MujocoWorld *MujocoElement::get_world() const
 
 void MujocoElement::request_compile() const
 {
+    if (class_owner) {
+        // An element of a default class: the class changed.
+        class_owner->section_changed();
+        return;
+    }
     if (MujocoWorld *world = get_world()) {
         world->request_compile();
     }
@@ -52,7 +59,81 @@ int MujocoElement::get_model_id(mjtObj p_type)
 
 Variant MujocoElement::get_inherited(const MujocoAttribute &p_attribute) const
 {
+    const char *section = get_class_section();
+    if (section) {
+        // A class's own elements inherit from the class's parent.
+        const MujocoDefault *cls = class_owner ? class_owner->get_parent_class() : get_used_class();
+        if (cls) {
+            return cls->get_section_element(section)->get_attribute(p_attribute.key);
+        }
+    }
     return p_attribute.get_base();
+}
+
+MujocoDefault *MujocoElement::get_used_class() const
+{
+    const MujocoWorld *world = get_world();
+    if (!world || class_owner) {
+        return nullptr;
+    }
+    StringName name = default_class;
+    for (Node *node = get_parent(); name.is_empty() && node && node != world; node = node->get_parent()) {
+        if (const MujocoBody *body = Object::cast_to<MujocoBody>(node)) {
+            name = body->get_child_class();
+        }
+    }
+    if (!name.is_empty()) {
+        if (MujocoDefault *cls = world->find_default_class(name)) {
+            return cls;
+        }
+        // Unknown class: reported by the configuration warnings; fall back to main.
+    }
+    return world->get_main_class();
+}
+
+mjsDefault *MujocoElement::get_spec_default(mjSpec *p_spec) const
+{
+    const MujocoDefault *cls = get_used_class();
+    if (cls && !cls->is_main()) {
+        if (mjsDefault *found = mjs_findDefault(p_spec, String(cls->get_name()).utf8().get_data())) {
+            return found;
+        }
+    }
+    return mjs_getSpecDefault(p_spec);
+}
+
+void MujocoElement::inherited_changed()
+{
+    update_configuration_warnings();
+    notify_property_list_changed();
+}
+
+void MujocoElement::set_default_class(const StringName &p_class)
+{
+    default_class = p_class;
+    if (MujocoWorld *world = get_world()) {
+        world->default_classes_changed();
+    }
+}
+
+StringName MujocoElement::get_default_class() const
+{
+    return default_class;
+}
+
+void MujocoElement::_validate_property(PropertyInfo &p_property) const
+{
+    if (p_property.name == StringName("default_class")) {
+        if (!get_class_section()) {
+            p_property.usage = PROPERTY_USAGE_NONE; // bodies and sensors have no class
+            return;
+        }
+        // Suggest the world's classes.
+        if (const MujocoWorld *world = get_world()) {
+            p_property.hint = PROPERTY_HINT_ENUM_SUGGESTION;
+            p_property.hint_string = String(",").join(world->get_default_class_names());
+        }
+    }
 }
 
 Variant MujocoElement::get_attribute(const StringName &p_key) const
@@ -154,6 +235,10 @@ void MujocoElement::_bind_methods()
 {
     ClassDB::bind_method(D_METHOD("set_overrides", "overrides"), &MujocoElement::set_overrides);
     ClassDB::bind_method(D_METHOD("get_overrides"), &MujocoElement::get_overrides);
+    ClassDB::bind_method(D_METHOD("set_default_class", "class"), &MujocoElement::set_default_class);
+    ClassDB::bind_method(D_METHOD("get_default_class"), &MujocoElement::get_default_class);
+    ClassDB::bind_method(D_METHOD("get_used_class"), &MujocoElement::get_used_class);
+    ADD_PROPERTY(PropertyInfo(Variant::STRING_NAME, "default_class"), "set_default_class", "get_default_class");
     ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "overrides", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NO_EDITOR), "set_overrides", "get_overrides");
 }
 
@@ -173,6 +258,10 @@ PackedStringArray MujocoElement::_get_configuration_warnings() const
         }
     }
 
+    if (world && !default_class.is_empty() && !world->find_default_class(default_class)) {
+        warnings.push_back(vformat("There is no default class \"%s\" in this world; \"main\" is used instead.", default_class));
+    }
+
     const Vector3 scale = get_scale();
     if (!scale.is_equal_approx(Vector3(1, 1, 1))) {
         warnings.push_back("MuJoCo does not support scale; it is ignored. Use this node's size properties instead.");
@@ -187,7 +276,8 @@ void MujocoElement::_notification(int p_what)
             // In the editor, moving this node or any ancestor changes the model.
             // At runtime the simulation drives transforms, so don't listen.
             set_notify_transform(Engine::get_singleton()->is_editor_hint());
-            update_configuration_warnings();
+            // The class context (enclosing bodies, world) may differ from before.
+            inherited_changed();
             request_compile();
             break;
         case NOTIFICATION_EXIT_TREE:

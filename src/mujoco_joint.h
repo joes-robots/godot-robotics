@@ -26,6 +26,9 @@ public:
     };
 
     mjsBody *add_to_spec(mjSpec *p_spec, mjsBody *p_body, const godot::Transform3D &p_transform, const godot::String &p_name) override;
+    const char *get_class_section() const override { return "joint"; }
+    void write_class_defaults(mjsDefault *p_default) override;
+    void inherited_changed() override;
     godot::PackedStringArray _get_configuration_warnings() const override;
 
     void set_type(Type p_type);
@@ -58,6 +61,8 @@ protected:
 
 private:
     void changed();
+    // Writes the class-able attributes (everything but the frame) into p_joint.
+    void write_attributes(mjsJoint *p_joint) const;
     // Index of this joint's value in qpos and qvel. Fails (with an error) for ball
     // and free joints, which have no single value, or if the model hasn't compiled.
     bool get_state_index(int &r_qpos, int &r_dof);

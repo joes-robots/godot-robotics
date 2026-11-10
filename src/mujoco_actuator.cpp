@@ -68,12 +68,12 @@ mjsBody *MujocoActuator::add_to_spec(mjSpec *p_spec, mjsBody *p_body, const Tran
         return p_body;
     }
 
-    mjsActuator *actuator = mjs_addActuator(p_spec, nullptr);
+    mjsActuator *actuator = mjs_addActuator(p_spec, get_spec_default(p_spec));
     mjs_setName(actuator->element, p_name.utf8().get_data());
     actuator->trntype = mjTRN_JOINT;
     // Joint names are their node paths relative to the world, like this actuator's.
     mjs_setString(actuator->target, String(get_world()->get_path_to(target)).utf8().get_data());
-    actuator->gear[0] = get_gear();
+    write_ranges(actuator);
     const double kp = get_kp();
     const double kv = get_kv();
 
@@ -101,16 +101,25 @@ mjsBody *MujocoActuator::add_to_spec(mjSpec *p_spec, mjsBody *p_body, const Tran
             actuator->biasprm[2] = -kv;
             break;
     }
+    return p_body;
+}
 
+void MujocoActuator::write_ranges(mjsActuator *p_actuator) const
+{
+    p_actuator->gear[0] = get_gear();
     const Vector2 ctrl_range = get_ctrl_range();
     const Vector2 force_range = get_force_range();
-    actuator->ctrllimited = is_ctrl_limited() ? mjLIMITED_TRUE : mjLIMITED_FALSE;
-    actuator->ctrlrange[0] = ctrl_range.x;
-    actuator->ctrlrange[1] = ctrl_range.y;
-    actuator->forcelimited = is_force_limited() ? mjLIMITED_TRUE : mjLIMITED_FALSE;
-    actuator->forcerange[0] = force_range.x;
-    actuator->forcerange[1] = force_range.y;
-    return p_body;
+    p_actuator->ctrllimited = is_ctrl_limited() ? mjLIMITED_TRUE : mjLIMITED_FALSE;
+    p_actuator->ctrlrange[0] = ctrl_range.x;
+    p_actuator->ctrlrange[1] = ctrl_range.y;
+    p_actuator->forcelimited = is_force_limited() ? mjLIMITED_TRUE : mjLIMITED_FALSE;
+    p_actuator->forcerange[0] = force_range.x;
+    p_actuator->forcerange[1] = force_range.y;
+}
+
+void MujocoActuator::write_class_defaults(mjsDefault *p_default)
+{
+    write_ranges(p_default->actuator);
 }
 
 PackedStringArray MujocoActuator::_get_configuration_warnings() const
@@ -163,9 +172,10 @@ void MujocoActuator::changed()
 void MujocoActuator::_validate_property(PropertyInfo &p_property) const
 {
     const StringName name = p_property.name;
-    if (name == StringName("kp") && type != TYPE_POSITION) {
+    // A class serves every actuator type, so it shows both gains.
+    if (name == StringName("kp") && type != TYPE_POSITION && !is_class_section()) {
         p_property.usage = PROPERTY_USAGE_NONE; // hidden; the value is stored in overrides
-    } else if (name == StringName("kv") && type == TYPE_MOTOR) {
+    } else if (name == StringName("kv") && type == TYPE_MOTOR && !is_class_section()) {
         p_property.usage = PROPERTY_USAGE_NONE; // hidden; the value is stored in overrides
     } else if (name == StringName("ctrl_range") && !is_ctrl_limited()) {
         p_property.usage = PROPERTY_USAGE_NONE; // hidden; the value is stored in overrides
