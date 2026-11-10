@@ -1,6 +1,7 @@
 #include "mujoco_editor_plugin.h"
 #include "mujoco_geom.h"
 #include "mujoco_joint.h"
+#include "mujoco_site.h"
 
 #include <cmath>
 
@@ -116,16 +117,49 @@ void MujocoJointGizmoPlugin::_redraw(const Ref<EditorNode3DGizmo> &p_gizmo)
     p_gizmo->add_collision_segments(lines);
 }
 
+bool MujocoSiteGizmoPlugin::_has_gizmo(Node3D *p_node) const
+{
+    return Object::cast_to<MujocoSite>(p_node) != nullptr;
+}
+
+String MujocoSiteGizmoPlugin::_get_gizmo_name() const
+{
+    return "MujocoSite";
+}
+
+void MujocoSiteGizmoPlugin::_redraw(const Ref<EditorNode3DGizmo> &p_gizmo)
+{
+    p_gizmo->clear();
+
+    const MujocoSite *site = Object::cast_to<MujocoSite>(p_gizmo->get_node_3d());
+    if (!site) {
+        return;
+    }
+    if (!material_created) {
+        create_material("site", Color(1.0, 0.55, 0.1, 0.35));
+        material_created = true;
+    }
+    const Ref<Mesh> mesh = site->get_shape_mesh();
+    if (mesh.is_valid()) {
+        p_gizmo->add_mesh(mesh, get_material("site", p_gizmo));
+        p_gizmo->add_collision_triangles(mesh->generate_triangle_mesh());
+    }
+}
+
 void MujocoEditorPlugin::_enter_tree()
 {
     geom_gizmo_plugin.instantiate();
     add_node_3d_gizmo_plugin(geom_gizmo_plugin);
     joint_gizmo_plugin.instantiate();
     add_node_3d_gizmo_plugin(joint_gizmo_plugin);
+    site_gizmo_plugin.instantiate();
+    add_node_3d_gizmo_plugin(site_gizmo_plugin);
 }
 
 void MujocoEditorPlugin::_exit_tree()
 {
+    remove_node_3d_gizmo_plugin(site_gizmo_plugin);
+    site_gizmo_plugin.unref();
     remove_node_3d_gizmo_plugin(joint_gizmo_plugin);
     joint_gizmo_plugin.unref();
     remove_node_3d_gizmo_plugin(geom_gizmo_plugin);

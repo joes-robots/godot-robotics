@@ -56,6 +56,12 @@ public:
     // The mesh drawn for this geom, in the geom's local frame (used by the editor gizmo).
     godot::Ref<godot::Mesh> get_shape_mesh() const;
 
+    // Shared with MujocoSite, which uses the same shapes and size conventions.
+    // MuJoCo's size parameters (half-sizes along MuJoCo's local axes) for a shape.
+    static void shape_size_to_mujoco(Shape p_shape, double p_radius, double p_height, const godot::Vector3 &p_size, double r_size[3]);
+    // A mesh of the shape, in the node's local frame.
+    static godot::Ref<godot::Mesh> make_shape_mesh(Shape p_shape, double p_radius, double p_height, const godot::Vector3 &p_size);
+
 protected:
     static void _bind_methods();
     void _validate_property(godot::PropertyInfo &p_property) const;

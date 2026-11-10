@@ -27,33 +27,7 @@ mjsBody *MujocoGeom::add_to_spec(mjSpec * /*p_spec*/, mjsBody *p_body, const Tra
     geom->type = static_cast<mjtGeom>(shape);
     mujoco_convert::to_mujoco(p_transform, geom->pos, geom->quat);
 
-    // MuJoCo sizes are half-sizes along its local axes, which are Godot local x, -z, y.
-    switch (shape) {
-        case SHAPE_SPHERE:
-            geom->size[0] = radius;
-            break;
-        case SHAPE_CAPSULE:
-            geom->size[0] = radius;
-            geom->size[1] = std::max(0.0, height / 2.0 - radius);
-            break;
-        case SHAPE_CYLINDER:
-            geom->size[0] = radius;
-            geom->size[1] = height / 2.0;
-            break;
-        case SHAPE_BOX:
-        case SHAPE_ELLIPSOID:
-            geom->size[0] = size.x / 2.0;
-            geom->size[1] = size.z / 2.0;
-            geom->size[2] = size.y / 2.0;
-            break;
-        case SHAPE_PLANE:
-            // Collision with a plane is infinite; x/y only size its rendering in MuJoCo.
-            // The third value is the rendering grid spacing.
-            geom->size[0] = size.x / 2.0;
-            geom->size[1] = size.z / 2.0;
-            geom->size[2] = 1.0;
-            break;
-    }
+    shape_size_to_mujoco(shape, radius, height, size, geom->size);
 
     geom->density = density;
     if (mass > 0.0) {
@@ -70,6 +44,38 @@ mjsBody *MujocoGeom::add_to_spec(mjSpec * /*p_spec*/, mjsBody *p_body, const Tra
     geom->rgba[3] = color.a;
 
     return p_body;
+}
+
+void MujocoGeom::shape_size_to_mujoco(Shape p_shape, double p_radius, double p_height, const Vector3 &p_size, double r_size[3])
+{
+    r_size[0] = r_size[1] = r_size[2] = 0.0;
+    // MuJoCo sizes are half-sizes along its local axes, which are Godot local x, -z, y.
+    switch (p_shape) {
+        case SHAPE_SPHERE:
+            r_size[0] = p_radius;
+            break;
+        case SHAPE_CAPSULE:
+            r_size[0] = p_radius;
+            r_size[1] = std::max(0.0, p_height / 2.0 - p_radius);
+            break;
+        case SHAPE_CYLINDER:
+            r_size[0] = p_radius;
+            r_size[1] = p_height / 2.0;
+            break;
+        case SHAPE_BOX:
+        case SHAPE_ELLIPSOID:
+            r_size[0] = p_size.x / 2.0;
+            r_size[1] = p_size.z / 2.0;
+            r_size[2] = p_size.y / 2.0;
+            break;
+        case SHAPE_PLANE:
+            // Collision with a plane is infinite; x/y only size its rendering in MuJoCo.
+            // The third value is the rendering grid spacing.
+            r_size[0] = p_size.x / 2.0;
+            r_size[1] = p_size.z / 2.0;
+            r_size[2] = 1.0;
+            break;
+    }
 }
 
 PackedStringArray MujocoGeom::_get_configuration_warnings() const
@@ -119,49 +125,55 @@ static Ref<ArrayMesh> make_ellipsoid_mesh(const Vector3 &p_size)
     return mesh;
 }
 
-void MujocoGeom::update_shape_mesh()
+Ref<Mesh> MujocoGeom::make_shape_mesh(Shape p_shape, double p_radius, double p_height, const Vector3 &p_size)
 {
     Ref<Mesh> mesh;
 
-    switch (shape) {
+    switch (p_shape) {
         case SHAPE_SPHERE: {
             Ref<SphereMesh> sphere;
             sphere.instantiate();
-            sphere->set_radius(radius);
-            sphere->set_height(2.0 * radius);
+            sphere->set_radius(p_radius);
+            sphere->set_height(2.0 * p_radius);
             mesh = sphere;
         } break;
         case SHAPE_CAPSULE: {
             Ref<CapsuleMesh> capsule;
             capsule.instantiate();
-            capsule->set_radius(radius);
-            capsule->set_height(std::max(height, 2.0 * radius));
+            capsule->set_radius(p_radius);
+            capsule->set_height(std::max(p_height, 2.0 * p_radius));
             mesh = capsule;
         } break;
         case SHAPE_CYLINDER: {
             Ref<CylinderMesh> cylinder;
             cylinder.instantiate();
-            cylinder->set_top_radius(radius);
-            cylinder->set_bottom_radius(radius);
-            cylinder->set_height(height);
+            cylinder->set_top_radius(p_radius);
+            cylinder->set_bottom_radius(p_radius);
+            cylinder->set_height(p_height);
             mesh = cylinder;
         } break;
         case SHAPE_BOX: {
             Ref<BoxMesh> box;
             box.instantiate();
-            box->set_size(size);
+            box->set_size(p_size);
             mesh = box;
         } break;
         case SHAPE_ELLIPSOID:
-            mesh = make_ellipsoid_mesh(size);
+            mesh = make_ellipsoid_mesh(p_size);
             break;
         case SHAPE_PLANE: {
             Ref<PlaneMesh> plane;
             plane.instantiate();
-            plane->set_size(Vector2(size.x, size.z));
+            plane->set_size(Vector2(p_size.x, p_size.z));
             mesh = plane;
         } break;
     }
+    return mesh;
+}
+
+void MujocoGeom::update_shape_mesh()
+{
+    const Ref<Mesh> mesh = make_shape_mesh(shape, radius, height, size);
 
     Ref<StandardMaterial3D> material;
     material.instantiate();

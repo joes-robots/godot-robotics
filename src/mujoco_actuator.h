@@ -59,6 +59,9 @@ public:
 
     // For MujocoWorld: this actuator's id in the current model, or -1.
     int get_actuator_id();
+    // The joint this actuator drives, or nullptr (with the reason in r_problem) if
+    // it has none and is left out of the model.
+    MujocoJoint *find_joint(godot::String &r_problem) const;
 
 protected:
     static void _bind_methods();
@@ -66,8 +69,6 @@ protected:
 
 private:
     void changed();
-    // The joint this actuator drives, or nullptr with the reason in r_problem.
-    MujocoJoint *find_joint(godot::String &r_problem) const;
     // Writes ctrl into the simulation, if this actuator is part of a compiled model.
     void write_ctrl();
 

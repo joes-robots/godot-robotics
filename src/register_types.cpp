@@ -13,6 +13,8 @@
 #include "mujoco_element.h"
 #include "mujoco_geom.h"
 #include "mujoco_joint.h"
+#include "mujoco_sensor.h"
+#include "mujoco_site.h"
 #include "mujoco_world.h"
 #include <mujoco/mujoco.h>
 
@@ -54,6 +56,7 @@ void initialize_gdextension_types(ModuleInitializationLevel p_level)
 		// itself is only instantiated when the editor UI is running.
 		GDREGISTER_INTERNAL_CLASS(MujocoGeomGizmoPlugin);
 		GDREGISTER_INTERNAL_CLASS(MujocoJointGizmoPlugin);
+		GDREGISTER_INTERNAL_CLASS(MujocoSiteGizmoPlugin);
 		GDREGISTER_INTERNAL_CLASS(MujocoEditorPlugin);
 		EditorPlugins::add_by_type<MujocoEditorPlugin>();
 		return;
@@ -68,6 +71,8 @@ void initialize_gdextension_types(ModuleInitializationLevel p_level)
 	GDREGISTER_CLASS(MujocoGeom);
 	GDREGISTER_CLASS(MujocoJoint);
 	GDREGISTER_CLASS(MujocoActuator);
+	GDREGISTER_CLASS(MujocoSite);
+	GDREGISTER_CLASS(MujocoSensor);
 }
 
 void uninitialize_gdextension_types(ModuleInitializationLevel p_level) {

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="MujocoSensor" inherits="MujocoElement" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+	</brief_description>
+	<description>
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="get_value">
+			<return type="Variant" />
+			<description>
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="target" type="NodePath" setter="set_target" getter="get_target" default="NodePath(&quot;..&quot;)">
+		</member>
+		<member name="type" type="int" setter="set_type" getter="get_type" enum="MujocoSensor.Type" default="0">
+		</member>
+	</members>
+	<constants>
+		<constant name="TYPE_JOINT_POSITION" value="0" enum="Type">
+		</constant>
+		<constant name="TYPE_JOINT_VELOCITY" value="1" enum="Type">
+		</constant>
+		<constant name="TYPE_ACTUATOR_FORCE" value="2" enum="Type">
+		</constant>
+		<constant name="TYPE_FRAME_POSITION" value="3" enum="Type">
+		</constant>
+		<constant name="TYPE_FRAME_ORIENTATION" value="4" enum="Type">
+		</constant>
+		<constant name="TYPE_FRAME_LINEAR_VELOCITY" value="5" enum="Type">
+		</constant>
+		<constant name="TYPE_FRAME_ANGULAR_VELOCITY" value="6" enum="Type">
+		</constant>
+		<constant name="TYPE_ACCELEROMETER" value="7" enum="Type">
+		</constant>
+		<constant name="TYPE_GYRO" value="8" enum="Type">
+		</constant>
+		<constant name="TYPE_VELOCIMETER" value="9" enum="Type">
+		</constant>
+		<constant name="TYPE_TOUCH" value="10" enum="Type">
+		</constant>
+	</constants>
+</class>
