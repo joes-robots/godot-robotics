@@ -6,6 +6,32 @@
 
 using namespace godot;
 
+namespace {
+
+const MujocoAttribute ACTUATOR_ATTRIBUTES[] = {
+    { "gear", Variant::FLOAT, { 1.0 } },
+    { "kp", Variant::FLOAT, { 1.0 } },
+    { "kv", Variant::FLOAT, { 0.0 } },
+    { "ctrl_limited", Variant::BOOL, { 0 } },
+    { "ctrl_range", Variant::VECTOR2, { -1, 1 } },
+    { "force_limited", Variant::BOOL, { 0 } },
+    { "force_range", Variant::VECTOR2, { -1, 1 } },
+};
+const MujocoAttributeTable ACTUATOR_TABLE = MUJOCO_ATTRIBUTE_TABLE(ACTUATOR_ATTRIBUTES);
+
+} // namespace
+
+const MujocoAttributeTable *MujocoActuator::get_attribute_table() const
+{
+    return &ACTUATOR_TABLE;
+}
+
+void MujocoActuator::overrides_changed()
+{
+    notify_property_list_changed();
+    changed();
+}
+
 MujocoJoint *MujocoActuator::find_joint(String &r_problem) const
 {
     const MujocoWorld *world = get_world();
@@ -47,7 +73,9 @@ mjsBody *MujocoActuator::add_to_spec(mjSpec *p_spec, mjsBody *p_body, const Tran
     actuator->trntype = mjTRN_JOINT;
     // Joint names are their node paths relative to the world, like this actuator's.
     mjs_setString(actuator->target, String(get_world()->get_path_to(target)).utf8().get_data());
-    actuator->gear[0] = gear;
+    actuator->gear[0] = get_gear();
+    const double kp = get_kp();
+    const double kv = get_kv();
 
     // MuJoCo's documented expansions of the <motor>, <position> and <velocity> shortcuts:
     // force = gain * ctrl + bias0 + bias1 * position + bias2 * velocity. Set directly
@@ -74,10 +102,12 @@ mjsBody *MujocoActuator::add_to_spec(mjSpec *p_spec, mjsBody *p_body, const Tran
             break;
     }
 
-    actuator->ctrllimited = ctrl_limited ? mjLIMITED_TRUE : mjLIMITED_FALSE;
+    const Vector2 ctrl_range = get_ctrl_range();
+    const Vector2 force_range = get_force_range();
+    actuator->ctrllimited = is_ctrl_limited() ? mjLIMITED_TRUE : mjLIMITED_FALSE;
     actuator->ctrlrange[0] = ctrl_range.x;
     actuator->ctrlrange[1] = ctrl_range.y;
-    actuator->forcelimited = force_limited ? mjLIMITED_TRUE : mjLIMITED_FALSE;
+    actuator->forcelimited = is_force_limited() ? mjLIMITED_TRUE : mjLIMITED_FALSE;
     actuator->forcerange[0] = force_range.x;
     actuator->forcerange[1] = force_range.y;
     return p_body;
@@ -90,13 +120,13 @@ PackedStringArray MujocoActuator::_get_configuration_warnings() const
     if (get_world() && !find_joint(problem)) {
         warnings.push_back(problem + " This actuator is left out of the model.");
     }
-    if (ctrl_limited && ctrl_range.x >= ctrl_range.y) {
+    if (is_ctrl_limited() && get_ctrl_range().x >= get_ctrl_range().y) {
         warnings.push_back("Control range minimum must be less than its maximum.");
     }
-    if (force_limited && force_range.x >= force_range.y) {
+    if (is_force_limited() && get_force_range().x >= get_force_range().y) {
         warnings.push_back("Force range minimum must be less than its maximum.");
     }
-    if (type == TYPE_VELOCITY && kv == 0.0) {
+    if (type == TYPE_VELOCITY && get_kv() == 0.0) {
         warnings.push_back("A velocity actuator with kv = 0 has no effect.");
     }
     return warnings;
@@ -134,13 +164,13 @@ void MujocoActuator::_validate_property(PropertyInfo &p_property) const
 {
     const StringName name = p_property.name;
     if (name == StringName("kp") && type != TYPE_POSITION) {
-        p_property.usage = PROPERTY_USAGE_NO_EDITOR;
+        p_property.usage = PROPERTY_USAGE_NONE; // hidden; the value is stored in overrides
     } else if (name == StringName("kv") && type == TYPE_MOTOR) {
-        p_property.usage = PROPERTY_USAGE_NO_EDITOR;
-    } else if (name == StringName("ctrl_range") && !ctrl_limited) {
-        p_property.usage = PROPERTY_USAGE_NO_EDITOR;
-    } else if (name == StringName("force_range") && !force_limited) {
-        p_property.usage = PROPERTY_USAGE_NO_EDITOR;
+        p_property.usage = PROPERTY_USAGE_NONE; // hidden; the value is stored in overrides
+    } else if (name == StringName("ctrl_range") && !is_ctrl_limited()) {
+        p_property.usage = PROPERTY_USAGE_NONE; // hidden; the value is stored in overrides
+    } else if (name == StringName("force_range") && !is_force_limited()) {
+        p_property.usage = PROPERTY_USAGE_NONE; // hidden; the value is stored in overrides
     }
 }
 
@@ -175,13 +205,14 @@ void MujocoActuator::_bind_methods()
     ADD_PROPERTY(PropertyInfo(Variant::INT, "type", PROPERTY_HINT_ENUM, "Motor,Position,Velocity"), "set_type", "get_type");
     ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "joint", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "MujocoJoint"), "set_joint", "get_joint");
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "ctrl", PROPERTY_HINT_RANGE, "-100,100,0.001,or_less,or_greater"), "set_ctrl", "get_ctrl");
-    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "gear", PROPERTY_HINT_RANGE, "-100,100,0.001,or_less,or_greater"), "set_gear", "get_gear");
-    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "kp", PROPERTY_HINT_RANGE, "0,1000,0.001,or_greater"), "set_kp", "get_kp");
-    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "kv", PROPERTY_HINT_RANGE, "0,100,0.001,or_greater"), "set_kv", "get_kv");
-    ADD_PROPERTY(PropertyInfo(Variant::BOOL, "ctrl_limited"), "set_ctrl_limited", "is_ctrl_limited");
-    ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "ctrl_range"), "set_ctrl_range", "get_ctrl_range");
-    ADD_PROPERTY(PropertyInfo(Variant::BOOL, "force_limited"), "set_force_limited", "is_force_limited");
-    ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "force_range"), "set_force_range", "get_force_range");
+    // Attribute properties are stored in "overrides", so they are editor-only here.
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "gear", PROPERTY_HINT_RANGE, "-100,100,0.001,or_less,or_greater", PROPERTY_USAGE_EDITOR), "set_gear", "get_gear");
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "kp", PROPERTY_HINT_RANGE, "0,1000,0.001,or_greater", PROPERTY_USAGE_EDITOR), "set_kp", "get_kp");
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "kv", PROPERTY_HINT_RANGE, "0,100,0.001,or_greater", PROPERTY_USAGE_EDITOR), "set_kv", "get_kv");
+    ADD_PROPERTY(PropertyInfo(Variant::BOOL, "ctrl_limited", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_EDITOR), "set_ctrl_limited", "is_ctrl_limited");
+    ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "ctrl_range", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_EDITOR), "set_ctrl_range", "get_ctrl_range");
+    ADD_PROPERTY(PropertyInfo(Variant::BOOL, "force_limited", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_EDITOR), "set_force_limited", "is_force_limited");
+    ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "force_range", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_EDITOR), "set_force_range", "get_force_range");
 }
 
 void MujocoActuator::set_type(Type p_type)
@@ -213,60 +244,60 @@ double MujocoActuator::get_ctrl() const { return ctrl; }
 
 void MujocoActuator::set_gear(double p_gear)
 {
-    gear = p_gear;
+    set_attribute("gear", p_gear);
     changed();
 }
 
-double MujocoActuator::get_gear() const { return gear; }
+double MujocoActuator::get_gear() const { return get_attribute("gear"); }
 
 void MujocoActuator::set_kp(double p_kp)
 {
     ERR_FAIL_COND_MSG(p_kp < 0.0, "kp must not be negative.");
-    kp = p_kp;
+    set_attribute("kp", p_kp);
     changed();
 }
 
-double MujocoActuator::get_kp() const { return kp; }
+double MujocoActuator::get_kp() const { return get_attribute("kp"); }
 
 void MujocoActuator::set_kv(double p_kv)
 {
     ERR_FAIL_COND_MSG(p_kv < 0.0, "kv must not be negative.");
-    kv = p_kv;
+    set_attribute("kv", p_kv);
     changed();
 }
 
-double MujocoActuator::get_kv() const { return kv; }
+double MujocoActuator::get_kv() const { return get_attribute("kv"); }
 
 void MujocoActuator::set_ctrl_limited(bool p_limited)
 {
-    ctrl_limited = p_limited;
+    set_attribute("ctrl_limited", p_limited);
     notify_property_list_changed();
     changed();
 }
 
-bool MujocoActuator::is_ctrl_limited() const { return ctrl_limited; }
+bool MujocoActuator::is_ctrl_limited() const { return get_attribute("ctrl_limited"); }
 
 void MujocoActuator::set_ctrl_range(const Vector2 &p_range)
 {
-    ctrl_range = p_range;
+    set_attribute("ctrl_range", p_range);
     changed();
 }
 
-Vector2 MujocoActuator::get_ctrl_range() const { return ctrl_range; }
+Vector2 MujocoActuator::get_ctrl_range() const { return get_attribute("ctrl_range"); }
 
 void MujocoActuator::set_force_limited(bool p_limited)
 {
-    force_limited = p_limited;
+    set_attribute("force_limited", p_limited);
     notify_property_list_changed();
     changed();
 }
 
-bool MujocoActuator::is_force_limited() const { return force_limited; }
+bool MujocoActuator::is_force_limited() const { return get_attribute("force_limited"); }
 
 void MujocoActuator::set_force_range(const Vector2 &p_range)
 {
-    force_range = p_range;
+    set_attribute("force_range", p_range);
     changed();
 }
 
-Vector2 MujocoActuator::get_force_range() const { return force_range; }
+Vector2 MujocoActuator::get_force_range() const { return get_attribute("force_range"); }

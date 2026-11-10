@@ -18,19 +18,19 @@
 		</member>
 		<member name="ctrl_limited" type="bool" setter="set_ctrl_limited" getter="is_ctrl_limited" default="false">
 		</member>
-		<member name="ctrl_range" type="Vector2" setter="set_ctrl_range" getter="get_ctrl_range" default="Vector2(-1, 1)">
+		<member name="ctrl_range" type="Vector2" setter="set_ctrl_range" getter="get_ctrl_range">
 		</member>
 		<member name="force_limited" type="bool" setter="set_force_limited" getter="is_force_limited" default="false">
 		</member>
-		<member name="force_range" type="Vector2" setter="set_force_range" getter="get_force_range" default="Vector2(-1, 1)">
+		<member name="force_range" type="Vector2" setter="set_force_range" getter="get_force_range">
 		</member>
 		<member name="gear" type="float" setter="set_gear" getter="get_gear" default="1.0">
 		</member>
 		<member name="joint" type="NodePath" setter="set_joint" getter="get_joint" default="NodePath(&quot;..&quot;)">
 		</member>
-		<member name="kp" type="float" setter="set_kp" getter="get_kp" default="1.0">
+		<member name="kp" type="float" setter="set_kp" getter="get_kp">
 		</member>
-		<member name="kv" type="float" setter="set_kv" getter="get_kv" default="0.0">
+		<member name="kv" type="float" setter="set_kv" getter="get_kv">
 		</member>
 		<member name="type" type="int" setter="set_type" getter="get_type" enum="MujocoActuator.Type" default="0">
 		</member>

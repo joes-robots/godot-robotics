@@ -39,7 +39,7 @@
 		</member>
 		<member name="limited" type="bool" setter="set_limited" getter="is_limited" default="false">
 		</member>
-		<member name="range" type="Vector2" setter="set_range" getter="get_range" default="Vector2(-1.5707964, 1.5707964)">
+		<member name="range" type="Vector2" setter="set_range" getter="get_range">
 		</member>
 		<member name="stiffness" type="float" setter="set_stiffness" getter="get_stiffness" default="0.0">
 		</member>

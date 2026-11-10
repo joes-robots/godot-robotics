@@ -1,6 +1,9 @@
 #pragma once
 
+#include "mujoco_attributes.h"
+
 #include <godot_cpp/classes/node3d.hpp>
+#include <godot_cpp/variant/dictionary.hpp>
 #include <mujoco/mujoco.h>
 
 class MujocoWorld;
@@ -11,6 +14,12 @@ class MujocoWorld;
 // An element belongs to its nearest MujocoWorld ancestor; every node in between
 // must be a Node3D. Elements hold only Godot-side properties: the world calls
 // add_to_spec() on each of them whenever it rebuilds its spec.
+//
+// Most of an element's properties are class-able attributes (see
+// mujoco_attributes.h). The element stores only those set on it, its overrides,
+// and inherits the rest. In the inspector, an overridden property shows a revert
+// arrow that removes the override; scripts do the same by setting the property to
+// null, e.g. geom.set("density", null).
 class MujocoElement : public godot::Node3D {
     GDCLASS(MujocoElement, godot::Node3D);
 
@@ -30,9 +39,36 @@ public:
 
     godot::PackedStringArray _get_configuration_warnings() const override;
 
+    // The value of attribute p_key: this element's override if it has one,
+    // otherwise the inherited value.
+    godot::Variant get_attribute(const godot::StringName &p_key) const;
+    bool has_override(const godot::StringName &p_key) const;
+    // The overrides, keyed by attribute. This is what scenes save: a property can't
+    // save itself, because Godot skips values equal to the class default (an
+    // explicit damping = 0 would be lost).
+    void set_overrides(const godot::Dictionary &p_overrides);
+    godot::Dictionary get_overrides() const;
+
 protected:
-    static void _bind_methods() {}
+    static void _bind_methods();
     void _notification(int p_what);
+
+    // The class-able attributes of this element type, or nullptr if it has none.
+    virtual const MujocoAttributeTable *get_attribute_table() const { return nullptr; }
+    // The attributes behind inspector property p_property (empty if none). By
+    // default, the attribute with the property's name.
+    virtual godot::PackedStringArray get_property_attributes(const godot::StringName &p_property) const;
+    // Stores an override. Reports an error and returns false for an unknown
+    // attribute or a value of the wrong type.
+    bool set_attribute(const godot::StringName &p_key, const godot::Variant &p_value);
+    // Called after overrides change other than through a property setter (revert,
+    // set_overrides()), so the element can refresh what depends on them.
+    virtual void overrides_changed() {}
+
+    // Revert support: assigning null to an attribute property removes its overrides.
+    bool _set(const godot::StringName &p_name, const godot::Variant &p_value);
+    bool _property_can_revert(const godot::StringName &p_name) const;
+    bool _property_get_revert(const godot::StringName &p_name, godot::Variant &r_property) const;
 
     // Call whenever something that affects the compiled model changes.
     void request_compile() const;
@@ -42,6 +78,10 @@ protected:
     int get_model_id(mjtObj p_type);
 
 private:
+    // The value attribute p_attribute has when this element doesn't override it.
+    godot::Variant get_inherited(const MujocoAttribute &p_attribute) const;
+
+    godot::Dictionary overrides;
     // Cache for get_model_id(), valid while the world's model generation matches.
     uint64_t cached_generation = 0;
     int cached_id = -1;

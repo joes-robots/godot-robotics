@@ -13,6 +13,74 @@
 
 using namespace godot;
 
+namespace {
+
+// The base sizes (0.5 m half-sizes) make a 1 m box, a 0.5 m sphere, a 2 m capsule
+// and a 1 m cylinder.
+const MujocoAttribute GEOM_ATTRIBUTES[] = {
+    { "shape", Variant::INT, { MujocoGeom::SHAPE_BOX } },
+    { "size0", Variant::FLOAT, { 0.5 } },
+    { "size1", Variant::FLOAT, { 0.5 } },
+    { "size2", Variant::FLOAT, { 0.5 } },
+    { "density", Variant::FLOAT, { 1000.0 } },
+    { "mass", Variant::FLOAT, { 0.0 } },
+    { "friction", Variant::VECTOR3, { 1, 0.005, 0.0001 } }, // MuJoCo's defaults
+    { "collision_layer", Variant::INT, { 1 } },
+    { "collision_mask", Variant::INT, { 1 } },
+    { "color", Variant::COLOR, { 0.5, 0.5, 0.5, 1.0 } },
+};
+const MujocoAttributeTable GEOM_TABLE = MUJOCO_ATTRIBUTE_TABLE(GEOM_ATTRIBUTES);
+
+} // namespace
+
+const MujocoAttributeTable *MujocoGeom::get_attribute_table() const
+{
+    return &GEOM_TABLE;
+}
+
+PackedStringArray MujocoGeom::get_property_attributes(const StringName &p_property) const
+{
+    PackedStringArray keys;
+    if (p_property == StringName("radius")) {
+        keys.push_back("size0");
+    } else if (p_property == StringName("height")) {
+        keys.push_back("size1");
+    } else if (p_property == StringName("size")) {
+        keys.push_back("size0");
+        keys.push_back("size1");
+        if (get_shape() != SHAPE_PLANE) {
+            keys.push_back("size2");
+        }
+    } else {
+        keys = MujocoElement::get_property_attributes(p_property);
+    }
+    return keys;
+}
+
+void MujocoGeom::overrides_changed()
+{
+    notify_property_list_changed();
+    changed();
+}
+
+void MujocoGeom::get_half_size(double r_half[3]) const
+{
+    r_half[0] = get_attribute("size0");
+    r_half[1] = get_attribute("size1");
+    r_half[2] = get_attribute("size2");
+}
+
+double MujocoGeom::height_from_half(Shape p_shape, const double p_half[3])
+{
+    return p_shape == SHAPE_CAPSULE ? 2.0 * (p_half[1] + p_half[0]) : 2.0 * p_half[1];
+}
+
+Vector3 MujocoGeom::extents_from_half(Shape p_shape, const double p_half[3])
+{
+    // MuJoCo's local x, y, z are Godot's local x, -z, y.
+    return Vector3(2.0 * p_half[0], p_shape == SHAPE_PLANE ? 0.0 : 2.0 * p_half[2], 2.0 * p_half[1]);
+}
+
 MujocoGeom::MujocoGeom()
 {
     shape_instance = memnew(MeshInstance3D);
@@ -24,20 +92,30 @@ mjsBody *MujocoGeom::add_to_spec(mjSpec * /*p_spec*/, mjsBody *p_body, const Tra
 {
     mjsGeom *geom = mjs_addGeom(p_body, nullptr);
     mjs_setName(geom->element, p_name.utf8().get_data());
+    const Shape shape = get_shape();
     geom->type = static_cast<mjtGeom>(shape);
     mujoco_convert::to_mujoco(p_transform, geom->pos, geom->quat);
 
-    shape_size_to_mujoco(shape, radius, height, size, geom->size);
+    get_half_size(geom->size);
+    // Clear the parameters the shape doesn't use, so the MJCF stays tidy.
+    if (shape == SHAPE_SPHERE) {
+        geom->size[1] = geom->size[2] = 0.0;
+    } else if (shape == SHAPE_CAPSULE || shape == SHAPE_CYLINDER) {
+        geom->size[2] = 0.0;
+    }
 
-    geom->density = density;
+    geom->density = get_density();
+    const double mass = get_mass();
     if (mass > 0.0) {
         geom->mass = mass; // otherwise left unset (NaN), so MuJoCo uses density
     }
+    const Vector3 friction = get_friction();
     geom->friction[0] = friction.x;
     geom->friction[1] = friction.y;
     geom->friction[2] = friction.z;
-    geom->contype = static_cast<int>(collision_layer);
-    geom->conaffinity = static_cast<int>(collision_mask);
+    geom->contype = static_cast<int>(get_collision_layer());
+    geom->conaffinity = static_cast<int>(get_collision_mask());
+    const Color color = get_color();
     geom->rgba[0] = color.r;
     geom->rgba[1] = color.g;
     geom->rgba[2] = color.b;
@@ -46,45 +124,9 @@ mjsBody *MujocoGeom::add_to_spec(mjSpec * /*p_spec*/, mjsBody *p_body, const Tra
     return p_body;
 }
 
-void MujocoGeom::shape_size_to_mujoco(Shape p_shape, double p_radius, double p_height, const Vector3 &p_size, double r_size[3])
-{
-    r_size[0] = r_size[1] = r_size[2] = 0.0;
-    // MuJoCo sizes are half-sizes along its local axes, which are Godot local x, -z, y.
-    switch (p_shape) {
-        case SHAPE_SPHERE:
-            r_size[0] = p_radius;
-            break;
-        case SHAPE_CAPSULE:
-            r_size[0] = p_radius;
-            r_size[1] = std::max(0.0, p_height / 2.0 - p_radius);
-            break;
-        case SHAPE_CYLINDER:
-            r_size[0] = p_radius;
-            r_size[1] = p_height / 2.0;
-            break;
-        case SHAPE_BOX:
-        case SHAPE_ELLIPSOID:
-            r_size[0] = p_size.x / 2.0;
-            r_size[1] = p_size.z / 2.0;
-            r_size[2] = p_size.y / 2.0;
-            break;
-        case SHAPE_PLANE:
-            // Collision with a plane is infinite; x/y only size its rendering in MuJoCo.
-            // The third value is the rendering grid spacing.
-            r_size[0] = p_size.x / 2.0;
-            r_size[1] = p_size.z / 2.0;
-            r_size[2] = 1.0;
-            break;
-    }
-}
-
 PackedStringArray MujocoGeom::_get_configuration_warnings() const
 {
-    PackedStringArray warnings = MujocoElement::_get_configuration_warnings();
-    if (shape == SHAPE_CAPSULE && height < 2.0 * radius) {
-        warnings.push_back("Capsule height is less than twice its radius; it is treated as a sphere.");
-    }
-    return warnings;
+    return MujocoElement::_get_configuration_warnings();
 }
 
 void MujocoGeom::changed()
@@ -125,46 +167,49 @@ static Ref<ArrayMesh> make_ellipsoid_mesh(const Vector3 &p_size)
     return mesh;
 }
 
-Ref<Mesh> MujocoGeom::make_shape_mesh(Shape p_shape, double p_radius, double p_height, const Vector3 &p_size)
+Ref<Mesh> MujocoGeom::make_shape_mesh(Shape p_shape, const double p_half[3])
 {
+    const double radius = p_half[0];
+    const double height = height_from_half(p_shape, p_half);
+    const Vector3 size = extents_from_half(p_shape, p_half);
     Ref<Mesh> mesh;
 
     switch (p_shape) {
         case SHAPE_SPHERE: {
             Ref<SphereMesh> sphere;
             sphere.instantiate();
-            sphere->set_radius(p_radius);
-            sphere->set_height(2.0 * p_radius);
+            sphere->set_radius(radius);
+            sphere->set_height(2.0 * radius);
             mesh = sphere;
         } break;
         case SHAPE_CAPSULE: {
             Ref<CapsuleMesh> capsule;
             capsule.instantiate();
-            capsule->set_radius(p_radius);
-            capsule->set_height(std::max(p_height, 2.0 * p_radius));
+            capsule->set_radius(radius);
+            capsule->set_height(std::max(height, 2.0 * radius));
             mesh = capsule;
         } break;
         case SHAPE_CYLINDER: {
             Ref<CylinderMesh> cylinder;
             cylinder.instantiate();
-            cylinder->set_top_radius(p_radius);
-            cylinder->set_bottom_radius(p_radius);
-            cylinder->set_height(p_height);
+            cylinder->set_top_radius(radius);
+            cylinder->set_bottom_radius(radius);
+            cylinder->set_height(height);
             mesh = cylinder;
         } break;
         case SHAPE_BOX: {
             Ref<BoxMesh> box;
             box.instantiate();
-            box->set_size(p_size);
+            box->set_size(size);
             mesh = box;
         } break;
         case SHAPE_ELLIPSOID:
-            mesh = make_ellipsoid_mesh(p_size);
+            mesh = make_ellipsoid_mesh(size);
             break;
         case SHAPE_PLANE: {
             Ref<PlaneMesh> plane;
             plane.instantiate();
-            plane->set_size(Vector2(p_size.x, p_size.z));
+            plane->set_size(Vector2(size.x, size.z));
             mesh = plane;
         } break;
     }
@@ -173,7 +218,10 @@ Ref<Mesh> MujocoGeom::make_shape_mesh(Shape p_shape, double p_radius, double p_h
 
 void MujocoGeom::update_shape_mesh()
 {
-    const Ref<Mesh> mesh = make_shape_mesh(shape, radius, height, size);
+    double half[3];
+    get_half_size(half);
+    const Ref<Mesh> mesh = make_shape_mesh(get_shape(), half);
+    const Color color = get_color();
 
     Ref<StandardMaterial3D> material;
     material.instantiate();
@@ -197,6 +245,7 @@ Ref<Mesh> MujocoGeom::get_shape_mesh() const
 void MujocoGeom::_validate_property(PropertyInfo &p_property) const
 {
     // Only show the size properties the current shape uses.
+    const Shape shape = get_shape();
     const bool uses_radius = shape == SHAPE_SPHERE || shape == SHAPE_CAPSULE || shape == SHAPE_CYLINDER;
     const bool uses_height = shape == SHAPE_CAPSULE || shape == SHAPE_CYLINDER;
     const bool uses_size = shape == SHAPE_BOX || shape == SHAPE_ELLIPSOID || shape == SHAPE_PLANE;
@@ -204,7 +253,7 @@ void MujocoGeom::_validate_property(PropertyInfo &p_property) const
     if ((p_property.name == StringName("radius") && !uses_radius) ||
             (p_property.name == StringName("height") && !uses_height) ||
             (p_property.name == StringName("size") && !uses_size)) {
-        p_property.usage = PROPERTY_USAGE_NO_EDITOR;
+        p_property.usage = PROPERTY_USAGE_NONE; // hidden; the value is stored in overrides
     }
 }
 
@@ -240,22 +289,23 @@ void MujocoGeom::_bind_methods()
     ClassDB::bind_method(D_METHOD("set_show_shape", "show"), &MujocoGeom::set_show_shape);
     ClassDB::bind_method(D_METHOD("is_showing_shape"), &MujocoGeom::is_showing_shape);
 
-    ADD_PROPERTY(PropertyInfo(Variant::INT, "shape", PROPERTY_HINT_ENUM, "Plane:0,Sphere:2,Capsule:3,Ellipsoid:4,Cylinder:5,Box:6"), "set_shape", "get_shape");
-    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "radius", PROPERTY_HINT_RANGE, "0.001,10,0.001,or_greater,suffix:m"), "set_radius", "get_radius");
-    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "height", PROPERTY_HINT_RANGE, "0.001,10,0.001,or_greater,suffix:m"), "set_height", "get_height");
-    ADD_PROPERTY(PropertyInfo(Variant::VECTOR3, "size", PROPERTY_HINT_NONE, "suffix:m"), "set_size", "get_size");
+    // Attribute properties are stored in "overrides", so they are editor-only here.
+    ADD_PROPERTY(PropertyInfo(Variant::INT, "shape", PROPERTY_HINT_ENUM, "Plane:0,Sphere:2,Capsule:3,Ellipsoid:4,Cylinder:5,Box:6", PROPERTY_USAGE_EDITOR), "set_shape", "get_shape");
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "radius", PROPERTY_HINT_RANGE, "0.001,10,0.001,or_greater,suffix:m", PROPERTY_USAGE_EDITOR), "set_radius", "get_radius");
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "height", PROPERTY_HINT_RANGE, "0.001,10,0.001,or_greater,suffix:m", PROPERTY_USAGE_EDITOR), "set_height", "get_height");
+    ADD_PROPERTY(PropertyInfo(Variant::VECTOR3, "size", PROPERTY_HINT_NONE, "suffix:m", PROPERTY_USAGE_EDITOR), "set_size", "get_size");
 
     ADD_GROUP("Mass", "");
-    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "density", PROPERTY_HINT_RANGE, "0,20000,0.1,or_greater,suffix:kg/m^3"), "set_density", "get_density");
-    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "mass", PROPERTY_HINT_RANGE, "0,1000,0.001,or_greater,suffix:kg"), "set_mass", "get_mass");
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "density", PROPERTY_HINT_RANGE, "0,20000,0.1,or_greater,suffix:kg/m^3", PROPERTY_USAGE_EDITOR), "set_density", "get_density");
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "mass", PROPERTY_HINT_RANGE, "0,1000,0.001,or_greater,suffix:kg", PROPERTY_USAGE_EDITOR), "set_mass", "get_mass");
 
     ADD_GROUP("Contact", "");
-    ADD_PROPERTY(PropertyInfo(Variant::VECTOR3, "friction"), "set_friction", "get_friction");
-    ADD_PROPERTY(PropertyInfo(Variant::INT, "collision_layer", PROPERTY_HINT_LAYERS_3D_PHYSICS), "set_collision_layer", "get_collision_layer");
-    ADD_PROPERTY(PropertyInfo(Variant::INT, "collision_mask", PROPERTY_HINT_LAYERS_3D_PHYSICS), "set_collision_mask", "get_collision_mask");
+    ADD_PROPERTY(PropertyInfo(Variant::VECTOR3, "friction", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_EDITOR), "set_friction", "get_friction");
+    ADD_PROPERTY(PropertyInfo(Variant::INT, "collision_layer", PROPERTY_HINT_LAYERS_3D_PHYSICS, "", PROPERTY_USAGE_EDITOR), "set_collision_layer", "get_collision_layer");
+    ADD_PROPERTY(PropertyInfo(Variant::INT, "collision_mask", PROPERTY_HINT_LAYERS_3D_PHYSICS, "", PROPERTY_USAGE_EDITOR), "set_collision_mask", "get_collision_mask");
 
     ADD_GROUP("Display", "");
-    ADD_PROPERTY(PropertyInfo(Variant::COLOR, "color"), "set_color", "get_color");
+    ADD_PROPERTY(PropertyInfo(Variant::COLOR, "color", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_EDITOR), "set_color", "get_color");
     ADD_PROPERTY(PropertyInfo(Variant::BOOL, "show_shape"), "set_show_shape", "is_showing_shape");
 }
 
@@ -264,90 +314,112 @@ void MujocoGeom::set_shape(Shape p_shape)
     ERR_FAIL_COND_MSG(p_shape != SHAPE_PLANE && p_shape != SHAPE_SPHERE && p_shape != SHAPE_CAPSULE &&
                     p_shape != SHAPE_ELLIPSOID && p_shape != SHAPE_CYLINDER && p_shape != SHAPE_BOX,
             vformat("Unsupported geom shape: %d.", p_shape));
-    shape = p_shape;
+    set_attribute("shape", p_shape);
     notify_property_list_changed();
     changed();
 }
 
-MujocoGeom::Shape MujocoGeom::get_shape() const { return shape; }
+MujocoGeom::Shape MujocoGeom::get_shape() const { return static_cast<Shape>(static_cast<int64_t>(get_attribute("shape"))); }
 
 void MujocoGeom::set_radius(double p_radius)
 {
     ERR_FAIL_COND_MSG(p_radius <= 0.0, "Radius must be positive.");
-    radius = p_radius;
+    // A capsule keeps a height set on it (see the class comment).
+    const bool keep_height = get_shape() == SHAPE_CAPSULE && has_override("size1");
+    const double height = get_height();
+    set_attribute("size0", p_radius);
+    if (keep_height) {
+        set_attribute("size1", std::max(0.0, height / 2.0 - p_radius));
+    }
     changed();
 }
 
-double MujocoGeom::get_radius() const { return radius; }
+double MujocoGeom::get_radius() const { return get_attribute("size0"); }
 
 void MujocoGeom::set_height(double p_height)
 {
     ERR_FAIL_COND_MSG(p_height <= 0.0, "Height must be positive.");
-    height = p_height;
+    const double half = get_shape() == SHAPE_CAPSULE ? std::max(0.0, p_height / 2.0 - get_radius()) : p_height / 2.0;
+    set_attribute("size1", half);
     changed();
 }
 
-double MujocoGeom::get_height() const { return height; }
+double MujocoGeom::get_height() const
+{
+    double half[3];
+    get_half_size(half);
+    return height_from_half(get_shape(), half);
+}
 
 void MujocoGeom::set_size(const Vector3 &p_size)
 {
     ERR_FAIL_COND_MSG(p_size.x < 0 || p_size.y < 0 || p_size.z < 0, "Size must not be negative.");
-    size = p_size;
+    set_attribute("size0", p_size.x / 2.0);
+    set_attribute("size1", p_size.z / 2.0);
+    // A plane's third parameter is MuJoCo's grid spacing, not a size.
+    if (get_shape() != SHAPE_PLANE) {
+        set_attribute("size2", p_size.y / 2.0);
+    }
     changed();
 }
 
-Vector3 MujocoGeom::get_size() const { return size; }
+Vector3 MujocoGeom::get_size() const
+{
+    double half[3];
+    get_half_size(half);
+    return extents_from_half(get_shape(), half);
+}
 
 void MujocoGeom::set_density(double p_density)
 {
     ERR_FAIL_COND_MSG(p_density < 0.0, "Density must not be negative.");
-    density = p_density;
+    set_attribute("density", p_density);
     changed();
 }
 
-double MujocoGeom::get_density() const { return density; }
+double MujocoGeom::get_density() const { return get_attribute("density"); }
 
 void MujocoGeom::set_mass(double p_mass)
 {
     ERR_FAIL_COND_MSG(p_mass < 0.0, "Mass must not be negative.");
-    mass = p_mass;
+    set_attribute("mass", p_mass);
     changed();
 }
 
-double MujocoGeom::get_mass() const { return mass; }
+double MujocoGeom::get_mass() const { return get_attribute("mass"); }
 
 void MujocoGeom::set_friction(const Vector3 &p_friction)
 {
     ERR_FAIL_COND_MSG(p_friction.x < 0 || p_friction.y < 0 || p_friction.z < 0, "Friction must not be negative.");
-    friction = p_friction;
+    set_attribute("friction", p_friction);
     changed();
 }
 
-Vector3 MujocoGeom::get_friction() const { return friction; }
+Vector3 MujocoGeom::get_friction() const { return get_attribute("friction"); }
 
 void MujocoGeom::set_collision_layer(uint32_t p_layer)
 {
-    collision_layer = p_layer;
+    set_attribute("collision_layer", p_layer);
     changed();
 }
 
-uint32_t MujocoGeom::get_collision_layer() const { return collision_layer; }
+uint32_t MujocoGeom::get_collision_layer() const { return static_cast<uint32_t>(static_cast<int64_t>(get_attribute("collision_layer"))); }
 
 void MujocoGeom::set_collision_mask(uint32_t p_mask)
 {
-    collision_mask = p_mask;
+    set_attribute("collision_mask", p_mask);
     changed();
 }
 
-uint32_t MujocoGeom::get_collision_mask() const { return collision_mask; }
+uint32_t MujocoGeom::get_collision_mask() const { return static_cast<uint32_t>(static_cast<int64_t>(get_attribute("collision_mask"))); }
 
 void MujocoGeom::set_color(const Color &p_color)
 {
-    color = p_color;
+    set_attribute("color", p_color);
     changed();
 }
 
-Color MujocoGeom::get_color() const { return color; }
+Color MujocoGeom::get_color() const { return get_attribute("color"); }
 
 void MujocoGeom::set_show_shape(bool p_show)
 {

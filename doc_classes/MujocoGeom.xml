@@ -17,11 +17,11 @@
 		</member>
 		<member name="friction" type="Vector3" setter="set_friction" getter="get_friction" default="Vector3(1, 0.005, 0.0001)">
 		</member>
-		<member name="height" type="float" setter="set_height" getter="get_height" default="2.0">
+		<member name="height" type="float" setter="set_height" getter="get_height">
 		</member>
 		<member name="mass" type="float" setter="set_mass" getter="get_mass" default="0.0">
 		</member>
-		<member name="radius" type="float" setter="set_radius" getter="get_radius" default="0.5">
+		<member name="radius" type="float" setter="set_radius" getter="get_radius">
 		</member>
 		<member name="shape" type="int" setter="set_shape" getter="get_shape" enum="MujocoGeom.Shape" default="6">
 		</member>

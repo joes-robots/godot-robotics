@@ -41,7 +41,8 @@ func run() -> void:
 	await process_frame
 	var e := mjcf_elements(world.get_mjcf())
 
-	check_numbers("plane: Godot 20x20 -> MuJoCo half-size", e["Floor"].get("size", ""), "10 10 1")
+	# The third plane parameter is MuJoCo's grid spacing (base 0.5), not a size.
+	check_numbers("plane: Godot 20x20 -> MuJoCo half-size", e["Floor"].get("size", ""), "10 10 0.5")
 	check_numbers("body pos through a plain Node3D offset", e["Offset/Box"].get("pos", ""), "1 -3 3")
 	check_numbers("90 deg about Godot Y = MuJoCo +Z", e["Offset/Box"].get("quat", ""), "0.707107 0 0 0.707107")
 	check_numbers("box: Godot 2,4,6 -> MuJoCo half x,z,y", e["Offset/Box/BoxGeom"].get("size", ""), "1 3 2")

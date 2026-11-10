@@ -66,6 +66,8 @@ public:
 protected:
     static void _bind_methods();
     void _validate_property(godot::PropertyInfo &p_property) const;
+    const MujocoAttributeTable *get_attribute_table() const override;
+    void overrides_changed() override;
 
 private:
     void changed();
@@ -75,13 +77,9 @@ private:
     Type type = TYPE_MOTOR;
     godot::NodePath joint = godot::NodePath("..");
     double ctrl = 0.0;
-    double gear = 1.0;
-    double kp = 1.0; // position: force per unit of position error
-    double kv = 0.0; // position: damping; velocity: force per unit of velocity error
-    bool ctrl_limited = false;
-    godot::Vector2 ctrl_range = godot::Vector2(-1, 1);
-    bool force_limited = false;
-    godot::Vector2 force_range = godot::Vector2(-1, 1);
+    // Attributes (see mujoco_element.h): gear, kp (position: force per unit of
+    // position error), kv (position: damping; velocity: force per unit of velocity
+    // error), ctrl_limited, ctrl_range, force_limited, force_range.
 };
 
 VARIANT_ENUM_CAST(MujocoActuator::Type);

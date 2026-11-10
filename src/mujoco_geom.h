@@ -8,9 +8,15 @@
 // A MuJoCo geom: collision shape and mass of the body it belongs to (the
 // nearest MujocoBody ancestor, or the static world body if there is none).
 //
-// Sizes use Godot conventions (full extents, total heights); the conversion to
-// MuJoCo's half-sizes happens in add_to_spec(). Capsule, cylinder and plane use
-// the node's local Y axis, like Godot's CapsuleMesh, CylinderMesh and PlaneMesh.
+// The size is stored as MuJoCo's three size parameters (half-sizes along MuJoCo's
+// local axes, which are the node's local x, -z and y), so default classes inherit
+// it the way MuJoCo does. The radius, height and size properties show it in Godot
+// conventions (full extents, total heights). Capsule, cylinder and plane use the
+// node's local Y axis, like Godot's CapsuleMesh, CylinderMesh and PlaneMesh.
+//
+// A capsule's height includes its caps but is stored as the length between them,
+// so a capsule that inherits its height gets longer when its radius grows (as in
+// MuJoCo). A height set on the capsule itself stays as set.
 class MujocoGeom : public MujocoElement {
     GDCLASS(MujocoGeom, MujocoElement);
 
@@ -56,31 +62,34 @@ public:
     // The mesh drawn for this geom, in the geom's local frame (used by the editor gizmo).
     godot::Ref<godot::Mesh> get_shape_mesh() const;
 
-    // Shared with MujocoSite, which uses the same shapes and size conventions.
-    // MuJoCo's size parameters (half-sizes along MuJoCo's local axes) for a shape.
-    static void shape_size_to_mujoco(Shape p_shape, double p_radius, double p_height, const godot::Vector3 &p_size, double r_size[3]);
+    // Shared with MujocoSite, which stores its size the same way. p_half is MuJoCo's
+    // size parameters.
     // A mesh of the shape, in the node's local frame.
-    static godot::Ref<godot::Mesh> make_shape_mesh(Shape p_shape, double p_radius, double p_height, const godot::Vector3 &p_size);
+    static godot::Ref<godot::Mesh> make_shape_mesh(Shape p_shape, const double p_half[3]);
+    // The height property: capsules include their caps; for shapes without a
+    // height, twice the second size parameter.
+    static double height_from_half(Shape p_shape, const double p_half[3]);
+    // The size property: full extents along Godot's local axes (planes: y is 0).
+    static godot::Vector3 extents_from_half(Shape p_shape, const double p_half[3]);
 
 protected:
     static void _bind_methods();
     void _validate_property(godot::PropertyInfo &p_property) const;
+    const MujocoAttributeTable *get_attribute_table() const override;
+    godot::PackedStringArray get_property_attributes(const godot::StringName &p_property) const override;
+    void overrides_changed() override;
 
 private:
     // A property that affects the model changed: refresh the drawn shape and recompile.
     void changed();
     void update_shape_mesh();
+    // MuJoCo's size parameters, as currently resolved.
+    void get_half_size(double r_half[3]) const;
 
-    Shape shape = SHAPE_BOX;
-    double radius = 0.5;                  // sphere, capsule, cylinder
-    double height = 2.0;                  // capsule (total, including caps), cylinder
-    godot::Vector3 size{ 1, 1, 1 };       // box and ellipsoid: full extents; plane: x and z extents
-    double density = 1000.0;              // kg/m^3, used when mass is 0
-    double mass = 0.0;                    // kg; 0 means compute from density
-    godot::Vector3 friction{ 1, 0.005, 0.0001 }; // slide, spin, roll (MuJoCo defaults)
-    uint32_t collision_layer = 1;         // MuJoCo contype
-    uint32_t collision_mask = 1;          // MuJoCo conaffinity
-    godot::Color color{ 0.5, 0.5, 0.5, 1.0 };
+    // Attributes (see mujoco_element.h): shape; size0, size1, size2 (MuJoCo's size
+    // parameters); density (kg/m^3, used when mass is 0); mass (kg); friction
+    // (slide, spin, roll); collision_layer and collision_mask (MuJoCo's contype and
+    // conaffinity); color.
     bool show_shape = true;
 
     // Internal child drawing the shape; not saved with the scene.

@@ -8,8 +8,8 @@
 // collisions. Sensors measure at sites; a touch sensor counts the contacts
 // inside its site's shape.
 //
-// Shapes and sizes use the same conventions as MujocoGeom (no planes). Sites
-// are only drawn by the editor gizmo, not in the running game.
+// Shapes and sizes work like MujocoGeom's (no planes), including how the size is
+// stored. Sites are only drawn by the editor gizmo, not in the running game.
 class MujocoSite : public MujocoElement {
     GDCLASS(MujocoSite, MujocoElement);
 
@@ -31,12 +31,14 @@ public:
 protected:
     static void _bind_methods();
     void _validate_property(godot::PropertyInfo &p_property) const;
+    const MujocoAttributeTable *get_attribute_table() const override;
+    godot::PackedStringArray get_property_attributes(const godot::StringName &p_property) const override;
+    void overrides_changed() override;
 
 private:
     void changed();
+    void get_half_size(double r_half[3]) const;
 
-    MujocoGeom::Shape shape = MujocoGeom::SHAPE_SPHERE;
-    double radius = 0.05;
-    double height = 0.2;
-    godot::Vector3 size{ 0.1, 0.1, 0.1 };
+    // Attributes (see mujoco_element.h): shape; size0, size1, size2 (MuJoCo's size
+    // parameters).
 };

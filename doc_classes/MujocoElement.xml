@@ -6,4 +6,8 @@
 	</description>
 	<tutorials>
 	</tutorials>
+	<members>
+		<member name="overrides" type="Dictionary" setter="set_overrides" getter="get_overrides" default="{}">
+		</member>
+	</members>
 </class>

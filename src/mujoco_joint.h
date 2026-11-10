@@ -53,6 +53,8 @@ public:
 protected:
     static void _bind_methods();
     void _validate_property(godot::PropertyInfo &p_property) const;
+    const MujocoAttributeTable *get_attribute_table() const override;
+    void overrides_changed() override;
 
 private:
     void changed();
@@ -60,14 +62,9 @@ private:
     // and free joints, which have no single value, or if the model hasn't compiled.
     bool get_state_index(int &r_qpos, int &r_dof);
 
-    Type type = TYPE_HINGE;
-    bool limited = false;
-    // Hinge: radians. Slide: meters. Ball: only y is used (maximum angle in radians).
-    godot::Vector2 range = godot::Vector2(-godot::Math::PI / 2, godot::Math::PI / 2);
-    double damping = 0.0;      // force (or torque) per unit velocity
-    double stiffness = 0.0;    // spring force (or torque) per unit displacement
-    double armature = 0.0;     // extra rotor inertia (or mass for slide)
-    double frictionloss = 0.0; // dry friction force (or torque)
+    // Attributes (see mujoco_element.h): type, limited, range (hinge: radians,
+    // slide: meters, ball: only y, the maximum angle), damping, stiffness,
+    // armature (extra rotor inertia, or mass for slide), frictionloss.
 };
 
 VARIANT_ENUM_CAST(MujocoJoint::Type);
