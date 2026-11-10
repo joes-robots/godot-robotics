@@ -2,7 +2,9 @@
 #include "mujoco_convert.h"
 
 #include <algorithm>
+#include <array>
 #include <limits>
+#include <map>
 
 #include <godot_cpp/classes/array_mesh.hpp>
 #include <godot_cpp/classes/box_mesh.hpp>
@@ -11,6 +13,7 @@
 #include <godot_cpp/classes/plane_mesh.hpp>
 #include <godot_cpp/classes/sphere_mesh.hpp>
 #include <godot_cpp/classes/standard_material3d.hpp>
+#include <godot_cpp/variant/callable_method_pointer.hpp>
 
 using namespace godot;
 
@@ -44,6 +47,9 @@ const MujocoAttribute GEOM_ATTRIBUTES[] = {
     { "solimp_power", Variant::FLOAT, { 2.0 } },
 };
 const MujocoAttributeTable GEOM_TABLE = MUJOCO_ATTRIBUTE_TABLE(GEOM_ATTRIBUTES);
+
+// Marks a spec mesh asset with the Mesh resource it was made from.
+const char *const MESH_USER_KEY = "godot_mesh";
 
 } // namespace
 
@@ -104,11 +110,109 @@ MujocoGeom::MujocoGeom()
 
 mjsBody *MujocoGeom::add_to_spec(mjSpec *p_spec, mjsBody *p_body, const Transform3D &p_transform, const String &p_name)
 {
+    String mesh_name;
+    if (get_shape() == SHAPE_MESH) {
+        // Without triangles there is nothing to simulate (see the warnings).
+        mesh_name = add_mesh_asset(p_spec, p_name);
+        if (mesh_name.is_empty()) {
+            return p_body;
+        }
+    }
     mjsGeom *geom = mjs_addGeom(p_body, get_spec_default(p_spec));
     mjs_setName(geom->element, p_name.utf8().get_data());
     write_attributes(geom);
+    if (!mesh_name.is_empty()) {
+        mjs_setString(geom->meshname, mesh_name.utf8().get_data());
+    }
     mujoco_convert::to_mujoco(p_transform, geom->pos, geom->quat);
     return p_body;
+}
+
+String MujocoGeom::add_mesh_asset(mjSpec *p_spec, const String &p_geom_name) const
+{
+    if (mesh.is_null()) {
+        return String();
+    }
+    // Geoms sharing a Mesh resource share its asset.
+    for (mjsElement *el = mjs_firstElement(p_spec, mjOBJ_MESH); el; el = mjs_nextElement(p_spec, el)) {
+        if (mjs_getUserValue(el, MESH_USER_KEY) == mesh.ptr()) {
+            return String::utf8(mjs_getString(mjs_getName(el)));
+        }
+    }
+    std::vector<float> vertices;
+    std::vector<int> faces;
+    mesh_to_mujoco(mesh, vertices, faces);
+    if (faces.empty()) {
+        return String();
+    }
+    // A readable name: the resource's name or file, else the geom's.
+    String base = mesh->get_name();
+    const String path = mesh->get_path();
+    if (base.is_empty() && !path.is_empty() && !path.contains("::")) {
+        base = path.get_file().get_basename();
+    }
+    if (base.is_empty()) {
+        base = p_geom_name;
+    }
+    String name = base;
+    for (int i = 2; mjs_findElement(p_spec, mjOBJ_MESH, name.utf8().get_data()); i++) {
+        name = base + "_" + itos(i);
+    }
+    mjsMesh *asset = mjs_addMesh(p_spec, nullptr);
+    mjs_setName(asset->element, name.utf8().get_data());
+    mjs_setFloat(asset->uservert, vertices.data(), static_cast<int>(vertices.size()));
+    mjs_setInt(asset->userface, faces.data(), static_cast<int>(faces.size()));
+    mjs_setUserValue(asset->element, MESH_USER_KEY, mesh.ptr());
+    return name;
+}
+
+void MujocoGeom::mesh_to_mujoco(const Ref<Mesh> &p_mesh, std::vector<float> &r_vertices, std::vector<int> &r_faces)
+{
+    r_vertices.clear();
+    r_faces.clear();
+    if (p_mesh.is_null()) {
+        return;
+    }
+    // MuJoCo position -> vertex index, to merge the copies Godot keeps per face.
+    std::map<std::array<float, 3>, int> index_of;
+    const ArrayMesh *array_mesh = Object::cast_to<ArrayMesh>(p_mesh.ptr());
+    for (int32_t surface = 0; surface < p_mesh->get_surface_count(); surface++) {
+        // Other meshes (BoxMesh, ...) are always triangles.
+        if (array_mesh && array_mesh->surface_get_primitive_type(surface) != Mesh::PRIMITIVE_TRIANGLES) {
+            continue;
+        }
+        const Array arrays = p_mesh->surface_get_arrays(surface);
+        const PackedVector3Array vertices = arrays[Mesh::ARRAY_VERTEX];
+        const PackedInt32Array indices = arrays[Mesh::ARRAY_INDEX];
+        std::vector<int> remap(static_cast<size_t>(vertices.size()));
+        for (int64_t i = 0; i < vertices.size(); i++) {
+            // Godot's x, y, z are MuJoCo's x, z, -y.
+            const Vector3 v = vertices[i];
+            const std::array<float, 3> key = { static_cast<float>(v.x), static_cast<float>(-v.z), static_cast<float>(v.y) };
+            const auto inserted = index_of.emplace(key, static_cast<int>(index_of.size()));
+            if (inserted.second) {
+                r_vertices.insert(r_vertices.end(), key.begin(), key.end());
+            }
+            remap[static_cast<size_t>(i)] = inserted.first->second;
+        }
+        const int64_t corners = indices.is_empty() ? vertices.size() : indices.size();
+        for (int64_t c = 0; c + 2 < corners; c += 3) {
+            int corner[3];
+            bool valid = true;
+            for (int k = 0; k < 3; k++) {
+                const int64_t index = indices.is_empty() ? c + k : indices[c + k];
+                valid = valid && index >= 0 && index < vertices.size();
+                corner[k] = valid ? remap[static_cast<size_t>(index)] : -1;
+            }
+            if (!valid || corner[0] == corner[1] || corner[1] == corner[2] || corner[0] == corner[2]) {
+                continue;
+            }
+            // Godot's front faces are clockwise, MuJoCo's counterclockwise.
+            r_faces.push_back(corner[0]);
+            r_faces.push_back(corner[2]);
+            r_faces.push_back(corner[1]);
+        }
+    }
 }
 
 void MujocoGeom::write_attributes(mjsGeom *p_geom) const
@@ -158,7 +262,18 @@ void MujocoGeom::inherited_changed()
 
 PackedStringArray MujocoGeom::_get_configuration_warnings() const
 {
-    return MujocoElement::_get_configuration_warnings();
+    PackedStringArray warnings = MujocoElement::_get_configuration_warnings();
+    if (!is_class_section() && get_shape() == SHAPE_MESH) {
+        std::vector<float> vertices;
+        std::vector<int> faces;
+        mesh_to_mujoco(mesh, vertices, faces);
+        if (mesh.is_null()) {
+            warnings.push_back("The Mesh shape needs a mesh. Until one is set, this geom is left out of the simulation.");
+        } else if (faces.empty()) {
+            warnings.push_back("The mesh has no triangles, so this geom is left out of the simulation.");
+        }
+    }
+    return warnings;
 }
 
 void MujocoGeom::changed()
@@ -248,6 +363,9 @@ Ref<Mesh> MujocoGeom::make_shape_mesh(Shape p_shape, const double p_half[3])
             plane->set_size(Vector2(size.x, size.z));
             mesh = plane;
         } break;
+        case SHAPE_MESH:
+            // Drawn from the geom's mesh property.
+            break;
     }
     return mesh;
 }
@@ -260,7 +378,8 @@ void MujocoGeom::update_shape_mesh()
     }
     double half[3];
     get_half_size(half);
-    const Ref<Mesh> mesh = make_shape_mesh(get_shape(), half);
+    const Shape shape = get_shape();
+    const Ref<Mesh> drawn = shape == SHAPE_MESH ? mesh : make_shape_mesh(shape, half);
     const Color color = get_color();
 
     Ref<StandardMaterial3D> material;
@@ -269,7 +388,7 @@ void MujocoGeom::update_shape_mesh()
     if (color.a < 1.0f) {
         material->set_transparency(BaseMaterial3D::TRANSPARENCY_ALPHA);
     }
-    shape_instance->set_mesh(mesh);
+    shape_instance->set_mesh(drawn);
     shape_instance->set_material_override(material);
     shape_instance->set_visible(show_shape);
 
@@ -295,6 +414,9 @@ void MujocoGeom::_validate_property(PropertyInfo &p_property) const
             (p_property.name == StringName("size") && !uses_size)) {
         p_property.usage = PROPERTY_USAGE_NONE; // hidden; the value is stored in overrides
     }
+    if (p_property.name == StringName("mesh") && shape != SHAPE_MESH) {
+        p_property.usage = PROPERTY_USAGE_STORAGE; // kept, but only shown for the Mesh shape
+    }
 }
 
 void MujocoGeom::_bind_methods()
@@ -305,6 +427,7 @@ void MujocoGeom::_bind_methods()
     BIND_ENUM_CONSTANT(SHAPE_ELLIPSOID);
     BIND_ENUM_CONSTANT(SHAPE_CYLINDER);
     BIND_ENUM_CONSTANT(SHAPE_BOX);
+    BIND_ENUM_CONSTANT(SHAPE_MESH);
 
     ClassDB::bind_method(D_METHOD("set_shape", "shape"), &MujocoGeom::set_shape);
     ClassDB::bind_method(D_METHOD("get_shape"), &MujocoGeom::get_shape);
@@ -314,6 +437,8 @@ void MujocoGeom::_bind_methods()
     ClassDB::bind_method(D_METHOD("get_height"), &MujocoGeom::get_height);
     ClassDB::bind_method(D_METHOD("set_size", "size"), &MujocoGeom::set_size);
     ClassDB::bind_method(D_METHOD("get_size"), &MujocoGeom::get_size);
+    ClassDB::bind_method(D_METHOD("set_mesh", "mesh"), &MujocoGeom::set_mesh);
+    ClassDB::bind_method(D_METHOD("get_mesh"), &MujocoGeom::get_mesh);
     ClassDB::bind_method(D_METHOD("set_density", "density"), &MujocoGeom::set_density);
     ClassDB::bind_method(D_METHOD("get_density"), &MujocoGeom::get_density);
     ClassDB::bind_method(D_METHOD("set_mass", "mass"), &MujocoGeom::set_mass);
@@ -354,10 +479,11 @@ void MujocoGeom::_bind_methods()
     ClassDB::bind_method(D_METHOD("is_showing_shape"), &MujocoGeom::is_showing_shape);
 
     // Attribute properties are stored in "overrides", so they are editor-only here.
-    ADD_PROPERTY(PropertyInfo(Variant::INT, "shape", PROPERTY_HINT_ENUM, "Plane:0,Sphere:2,Capsule:3,Ellipsoid:4,Cylinder:5,Box:6", PROPERTY_USAGE_EDITOR), "set_shape", "get_shape");
+    ADD_PROPERTY(PropertyInfo(Variant::INT, "shape", PROPERTY_HINT_ENUM, "Plane:0,Sphere:2,Capsule:3,Ellipsoid:4,Cylinder:5,Box:6,Mesh:7", PROPERTY_USAGE_EDITOR), "set_shape", "get_shape");
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "radius", PROPERTY_HINT_RANGE, "0.001,10,0.001,or_greater,suffix:m", PROPERTY_USAGE_EDITOR), "set_radius", "get_radius");
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "height", PROPERTY_HINT_RANGE, "0.001,10,0.001,or_greater,suffix:m", PROPERTY_USAGE_EDITOR), "set_height", "get_height");
     ADD_PROPERTY(PropertyInfo(Variant::VECTOR3, "size", PROPERTY_HINT_NONE, "suffix:m", PROPERTY_USAGE_EDITOR), "set_size", "get_size");
+    ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "mesh", PROPERTY_HINT_RESOURCE_TYPE, "Mesh"), "set_mesh", "get_mesh");
 
     ADD_GROUP("Mass", "");
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "density", PROPERTY_HINT_RANGE, "0,20000,0.1,or_greater,suffix:kg/m^3", PROPERTY_USAGE_EDITOR), "set_density", "get_density");
@@ -390,7 +516,7 @@ void MujocoGeom::_bind_methods()
 void MujocoGeom::set_shape(Shape p_shape)
 {
     ERR_FAIL_COND_MSG(p_shape != SHAPE_PLANE && p_shape != SHAPE_SPHERE && p_shape != SHAPE_CAPSULE &&
-                    p_shape != SHAPE_ELLIPSOID && p_shape != SHAPE_CYLINDER && p_shape != SHAPE_BOX,
+                    p_shape != SHAPE_ELLIPSOID && p_shape != SHAPE_CYLINDER && p_shape != SHAPE_BOX && p_shape != SHAPE_MESH,
             vformat("Unsupported geom shape: %d.", p_shape));
     set_attribute("shape", p_shape);
     notify_property_list_changed();
@@ -447,6 +573,25 @@ Vector3 MujocoGeom::get_size() const
     get_half_size(half);
     return extents_from_half(get_shape(), half);
 }
+
+void MujocoGeom::set_mesh(const Ref<Mesh> &p_mesh)
+{
+    if (mesh == p_mesh) {
+        return;
+    }
+    // Editing the mesh (e.g. a BoxMesh's size) changes the model too.
+    const Callable on_changed = callable_mp(this, &MujocoGeom::changed);
+    if (mesh.is_valid() && mesh->is_connected("changed", on_changed)) {
+        mesh->disconnect("changed", on_changed);
+    }
+    mesh = p_mesh;
+    if (mesh.is_valid()) {
+        mesh->connect("changed", on_changed);
+    }
+    changed();
+}
+
+Ref<Mesh> MujocoGeom::get_mesh() const { return mesh; }
 
 void MujocoGeom::set_density(double p_density)
 {

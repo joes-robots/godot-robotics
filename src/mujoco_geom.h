@@ -5,6 +5,8 @@
 #include <godot_cpp/classes/mesh_instance3d.hpp>
 #include <godot_cpp/variant/color.hpp>
 
+#include <vector>
+
 // A MuJoCo geom: collision shape and mass of the body it belongs to (the
 // nearest MujocoBody ancestor, or the static world body if there is none).
 //
@@ -17,6 +19,10 @@
 // A capsule's height includes its caps but is stored as the length between them,
 // so a capsule that inherits its height gets longer when its radius grows (as in
 // MuJoCo). A height set on the capsule itself stays as set.
+//
+// The Mesh shape uses the mesh property (any Mesh resource, in the node's local
+// frame) for mass and inertia, and its convex hull for contacts, as MuJoCo does.
+// Geoms that share a Mesh resource share one MuJoCo mesh asset.
 class MujocoGeom : public MujocoElement {
     GDCLASS(MujocoGeom, MujocoElement);
 
@@ -29,6 +35,7 @@ public:
         SHAPE_ELLIPSOID = mjGEOM_ELLIPSOID,
         SHAPE_CYLINDER = mjGEOM_CYLINDER,
         SHAPE_BOX = mjGEOM_BOX,
+        SHAPE_MESH = mjGEOM_MESH,
     };
 
     MujocoGeom();
@@ -47,6 +54,8 @@ public:
     double get_height() const;
     void set_size(const godot::Vector3 &p_size);
     godot::Vector3 get_size() const;
+    void set_mesh(const godot::Ref<godot::Mesh> &p_mesh);
+    godot::Ref<godot::Mesh> get_mesh() const;
     void set_density(double p_density);
     double get_density() const;
     void set_mass(double p_mass);
@@ -100,6 +109,10 @@ public:
     static double height_from_half(Shape p_shape, const double p_half[3]);
     // The size property: full extents along Godot's local axes (planes: y is 0).
     static godot::Vector3 extents_from_half(Shape p_shape, const double p_half[3]);
+    // p_mesh's triangles as a MuJoCo mesh: vertices (x, y, z in MuJoCo's axes, with
+    // identical positions merged) and faces (counterclockwise seen from outside).
+    // Surfaces that aren't triangles are skipped.
+    static void mesh_to_mujoco(const godot::Ref<godot::Mesh> &p_mesh, std::vector<float> &r_vertices, std::vector<int> &r_faces);
 
 protected:
     static void _bind_methods();
@@ -116,6 +129,9 @@ private:
     void get_half_size(double r_half[3]) const;
     // Writes the class-able attributes (everything but the frame) into p_geom.
     void write_attributes(mjsGeom *p_geom) const;
+    // The name of p_spec's mesh asset for the mesh property, added on first use.
+    // Empty if the mesh has no triangles.
+    godot::String add_mesh_asset(mjSpec *p_spec, const godot::String &p_geom_name) const;
 
     // Attributes (see mujoco_element.h): shape; size0, size1, size2 (MuJoCo's size
     // parameters); density (kg/m^3, used when mass is 0); mass (kg); friction
@@ -123,6 +139,8 @@ private:
     // conaffinity); color; and the contact parameters condim, priority, margin,
     // gap, solmix, solref_* and solimp_* (MuJoCo's solref and solimp, by name).
     bool show_shape = true;
+    // Not class-able: a class can't hold a mesh.
+    godot::Ref<godot::Mesh> mesh;
 
     // Internal child drawing the shape; not saved with the scene.
     godot::MeshInstance3D *shape_instance = nullptr;

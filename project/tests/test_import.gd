@@ -5,12 +5,12 @@ extends "res://tests/test_base.gd"
 
 const EXTRAS := """
 <mujoco model="extras">
-  <asset><mesh name="tetra" vertex="0 0 0  1 0 0  0 1 0  0 0 1"/></asset>
+  <asset><hfield name="ground" nrow="2" ncol="2" size="1 1 0.1 0.1" elevation="0 0 0 0"/></asset>
   <worldbody>
+    <geom type="hfield" hfield="ground"/>
     <body name="a" pos="0 0 1">
       <freejoint/>
       <inertial pos="0 0 0" mass="3" diaginertia="0.1 0.1 0.1"/>
-      <geom type="mesh" mesh="tetra"/>
       <geom name="rough" type="box" size="0.1 0.1 0.1" condim="1"/>
       <site name="s1"/>
     </body>
@@ -98,7 +98,7 @@ func run() -> void:
 	check("extras import", extras != null)
 	var report := importer.get_report()
 	print("report: %s" % [report])
-	check("reports mesh geoms", report_has(report, "Mesh geoms"))
+	check("reports height field geoms", report_has(report, "Height field geoms"))
 	# Imported since Phase 3.3 (see test_contact): explicit inertia, condim, joint ref.
 	check("no longer reports inertia, contact parameters or ref", not report_has(report, "inertia") and not report_has(report, "condim") and not report_has(report, "ref"))
 	check("reports tendons", report_has(report, "Tendons"))
@@ -109,7 +109,7 @@ func run() -> void:
 	await process_frame
 	diffs = importer.verify(extras, 100)
 	print("verify: %s" % [diffs])
-	check("verify finds what was left out (the mesh geom, the muscle)", report_has(diffs, "Geom '#0' was not imported") and report_has(diffs, "Actuator 'm' was not imported"))
+	check("verify finds what was left out (the height field, the muscle)", report_has(diffs, "Geom '#0' was not imported") and report_has(diffs, "Actuator 'm' was not imported"))
 	check("but not the inertia or contact parameters", not report_has(diffs, "mass") and not report_has(diffs, "condim"))
 	extras.queue_free()
 

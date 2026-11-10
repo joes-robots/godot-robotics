@@ -10,10 +10,14 @@
 #include "mujoco_site.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstring>
+#include <map>
 
+#include <godot_cpp/classes/dir_access.hpp>
 #include <godot_cpp/classes/project_settings.hpp>
+#include <godot_cpp/classes/resource_saver.hpp>
 #include <godot_cpp/classes/xml_parser.hpp>
 #include <godot_cpp/core/math.hpp>
 #include <godot_cpp/variant/color.hpp>
@@ -75,13 +79,11 @@ const char *geom_type_name(int p_type)
 {
     switch (p_type) {
         case mjGEOM_HFIELD:
-            return "height field";
-        case mjGEOM_MESH:
-            return "mesh";
+            return "Height field";
         case mjGEOM_SDF:
             return "SDF";
         default:
-            return "unknown";
+            return "Unknown";
     }
 }
 
@@ -139,7 +141,7 @@ void add_contact_values(Dictionary &r_values, int p_condim, int p_priority, doub
 Dictionary geom_values(const mjsGeom *p_geom)
 {
     Dictionary values;
-    if (is_primitive_shape(p_geom->type)) {
+    if (is_primitive_shape(p_geom->type) || p_geom->type == mjGEOM_MESH) {
         values["shape"] = static_cast<int64_t>(p_geom->type);
     }
     values["size0"] = p_geom->size[0];
@@ -198,6 +200,47 @@ T *node_of(const std::vector<uint64_t> &p_nodes, int p_id)
     return Object::cast_to<T>(ObjectDB::get_instance(p_nodes[p_id]));
 }
 
+// A mesh geom's vertices in its body's frame.
+std::vector<std::array<double, 3>> mesh_geom_points(const mjModel *p_m, int p_geom)
+{
+    std::vector<std::array<double, 3>> points;
+    const int mesh = p_m->geom_dataid[p_geom];
+    if (mesh < 0) {
+        return points;
+    }
+    const float *vertices = p_m->mesh_vert + 3 * p_m->mesh_vertadr[mesh];
+    for (int v = 0; v < p_m->mesh_vertnum[mesh]; v++) {
+        const mjtNum local[3] = { vertices[3 * v], vertices[3 * v + 1], vertices[3 * v + 2] };
+        std::array<double, 3> point;
+        mju_rotVecQuat(point.data(), local, p_m->geom_quat + 4 * p_geom);
+        for (int k = 0; k < 3; k++) {
+            point[k] += p_m->geom_pos[3 * p_geom + k];
+        }
+        points.push_back(point);
+    }
+    return points;
+}
+
+// The largest distance from a vertex of p_a (up to 200 of them) to the nearest
+// vertex of p_b. The order of the vertices doesn't matter.
+double farthest_point(const std::vector<std::array<double, 3>> &p_a, const std::vector<std::array<double, 3>> &p_b)
+{
+    if (p_a.empty() || p_b.empty()) {
+        return p_a.empty() && p_b.empty() ? 0.0 : INFINITY;
+    }
+    double worst = 0.0;
+    const size_t stride = std::max<size_t>(1, p_a.size() / 200);
+    for (size_t i = 0; i < p_a.size(); i += stride) {
+        double nearest = INFINITY;
+        for (const std::array<double, 3> &b : p_b) {
+            const double dx = p_a[i][0] - b[0], dy = p_a[i][1] - b[1], dz = p_a[i][2] - b[2];
+            nearest = std::min(nearest, dx * dx + dy * dy + dz * dz);
+        }
+        worst = std::max(worst, nearest);
+    }
+    return std::sqrt(worst);
+}
+
 void set_owner_recursive(Node *p_node, Node *p_owner)
 {
     const int count = p_node->get_child_count();
@@ -221,6 +264,7 @@ void MujocoImporter::reset()
     for (std::vector<uint64_t> &list : nodes) {
         list.clear();
     }
+    meshes.clear();
     notes.clear();
 }
 
@@ -287,6 +331,7 @@ MujocoWorld *MujocoImporter::import_spec(mjSpec *p_spec)
     nodes[KIND_SITE].assign(model->nsite, 0);
     nodes[KIND_ACTUATOR].assign(model->nu, 0);
     nodes[KIND_SENSOR].assign(model->nsensor, 0);
+    meshes.assign(model->nmesh, Ref<ArrayMesh>());
 
     MujocoWorld *world = memnew(MujocoWorld);
     const String model_name = mjs_getString(spec->modelname);
@@ -497,18 +542,30 @@ void MujocoImporter::import_body_children(mjsBody *p_body, Node *p_node, MujocoW
     for (mjsElement *el = mjs_firstChild(p_body, mjOBJ_GEOM, 0); el; el = mjs_nextChild(p_body, el, 0)) {
         const int id = mjs_getId(el);
         const int type = m->geom_type[id];
-        if (!is_primitive_shape(type)) {
-            note(vformat("%s geoms are not supported yet and were left out", String(geom_type_name(type)).capitalize()));
+        if (!is_primitive_shape(type) && type != mjGEOM_MESH) {
+            note(vformat("%s geoms are not supported yet and were left out", geom_type_name(type)));
             continue;
         }
         const mjsGeom *spec_geom = mjs_asGeom(el);
         MujocoGeom *geom = memnew(MujocoGeom);
-        geom->set_transform(mujoco_convert::to_godot(m->geom_pos + 3 * id, m->geom_quat + 4 * id));
+        Transform3D frame = mujoco_convert::to_godot(m->geom_pos + 3 * id, m->geom_quat + 4 * id);
         Dictionary values;
         values["shape"] = static_cast<int64_t>(type);
-        values["size0"] = m->geom_size[3 * id];
-        values["size1"] = m->geom_size[3 * id + 1];
-        values["size2"] = m->geom_size[3 * id + 2];
+        if (type == mjGEOM_MESH) {
+            // The compiled geom frame includes the mesh's own offset (MuJoCo moves the
+            // vertices to their center of mass); the ArrayMesh keeps the file's frame.
+            const int mesh_id = m->geom_dataid[id];
+            frame = frame * mujoco_convert::to_godot(m->mesh_pos + 3 * mesh_id, m->mesh_quat + 4 * mesh_id).affine_inverse();
+            geom->set_mesh(mesh_resource(mesh_id));
+        } else {
+            values["size0"] = m->geom_size[3 * id];
+            values["size1"] = m->geom_size[3 * id + 1];
+            values["size2"] = m->geom_size[3 * id + 2];
+        }
+        geom->set_transform(frame);
+        if (spec_geom->typeinertia == mjINERTIA_SHELL) {
+            note("Shell inertia (shellinertia) is not supported yet; the geom's mass is spread over its volume");
+        }
         // The compiled model keeps only the body's mass, so these come from the spec.
         values["density"] = spec_geom->density;
         values["mass"] = std::isnan(spec_geom->mass) ? 0.0 : spec_geom->mass;
@@ -580,6 +637,116 @@ void MujocoImporter::import_body_children(mjsBody *p_body, Node *p_node, MujocoW
         nodes[KIND_BODY][id] = body->get_instance_id();
         import_body_children(spec_body, body, p_world, child_class);
     }
+}
+
+Ref<ArrayMesh> MujocoImporter::mesh_resource(int p_id)
+{
+    if (meshes[p_id].is_valid()) {
+        return meshes[p_id];
+    }
+    const mjModel *m = model.get();
+    mjsMesh *spec_mesh = mjs_asMesh(mjs_findElement(spec.get(), mjOBJ_MESH, mj_id2name(m, mjOBJ_MESH, p_id)));
+    if (spec_mesh) {
+        if (spec_mesh->inertia != mjMESH_INERTIA_LEGACY) {
+            note("Mesh inertia modes other than legacy (convex, exact, shell) are not supported yet; legacy is used");
+        }
+        if (spec_mesh->maxhullvert != -1) {
+            note("Mesh maxhullvert is not supported yet; the full convex hull is used");
+        }
+    }
+
+    // MuJoCo keeps the scaled vertices in the mesh's inertial frame; mesh_pos and
+    // mesh_quat take them back to the file's frame.
+    const Transform3D to_file = mujoco_convert::to_godot(m->mesh_pos + 3 * p_id, m->mesh_quat + 4 * p_id);
+    const float *vertices = m->mesh_vert + 3 * m->mesh_vertadr[p_id];
+    const float *normals = m->mesh_normal + 3 * m->mesh_normaladr[p_id];
+    const int *faces = m->mesh_face + 3 * m->mesh_faceadr[p_id];
+    const int *face_normals = m->mesh_facenormal + 3 * m->mesh_faceadr[p_id];
+    const int vertex_count = m->mesh_vertnum[p_id];
+    const int normal_count = m->mesh_normalnum[p_id];
+
+    // The first vertex_count vertices are MuJoCo's, in its order, so exporting the
+    // mesh (which merges equal positions) gives MuJoCo back the same vertex list:
+    // the convex hull, and so the contacts, depend on that order. Corners whose
+    // normal differs from the first one at their position get a copy.
+    PackedVector3Array godot_vertices;
+    PackedVector3Array godot_normals;
+    godot_vertices.resize(vertex_count);
+    godot_normals.resize(vertex_count);
+    std::vector<int> first_normal(static_cast<size_t>(vertex_count), -1);
+    for (int v = 0; v < vertex_count; v++) {
+        const mjtNum vertex[3] = { vertices[3 * v], vertices[3 * v + 1], vertices[3 * v + 2] };
+        godot_vertices.set(v, to_file.xform(mujoco_convert::to_godot(vertex)));
+        godot_normals.set(v, Vector3(0, 1, 0));
+    }
+    auto godot_normal = [&](int p_normal) {
+        if (p_normal < 0 || p_normal >= normal_count) {
+            return Vector3(0, 1, 0);
+        }
+        const mjtNum normal[3] = { normals[3 * p_normal], normals[3 * p_normal + 1], normals[3 * p_normal + 2] };
+        return to_file.basis.xform(mujoco_convert::to_godot(normal)).normalized();
+    };
+    std::map<std::pair<int, int>, int> copies;
+    PackedInt32Array indices;
+    for (int f = 0; f < m->mesh_facenum[p_id]; f++) {
+        // MuJoCo's faces are counterclockwise, Godot's clockwise.
+        for (const int k : { 0, 2, 1 }) {
+            const int v = faces[3 * f + k];
+            const int n = face_normals[3 * f + k];
+            ERR_CONTINUE(v < 0 || v >= vertex_count);
+            int index = v;
+            if (first_normal[v] < 0) {
+                first_normal[v] = n;
+                godot_normals.set(v, godot_normal(n));
+            } else if (first_normal[v] != n) {
+                const auto copy = copies.emplace(std::make_pair(v, n), static_cast<int>(godot_vertices.size()));
+                if (copy.second) {
+                    godot_vertices.push_back(godot_vertices[v]);
+                    godot_normals.push_back(godot_normal(n));
+                }
+                index = copy.first->second;
+            }
+            indices.push_back(index);
+        }
+    }
+    Array arrays;
+    arrays.resize(Mesh::ARRAY_MAX);
+    arrays[Mesh::ARRAY_VERTEX] = godot_vertices;
+    arrays[Mesh::ARRAY_NORMAL] = godot_normals;
+    arrays[Mesh::ARRAY_INDEX] = indices;
+    Ref<ArrayMesh> mesh;
+    mesh.instantiate();
+    mesh->add_surface_from_arrays(Mesh::PRIMITIVE_TRIANGLES, arrays);
+    const String name = String::utf8(mj_id2name(m, mjOBJ_MESH, p_id));
+    mesh->set_name(name.is_empty() ? vformat("mesh%d", p_id) : name);
+    meshes[p_id] = mesh;
+    return mesh;
+}
+
+Error MujocoImporter::save_meshes(const String &p_directory)
+{
+    Error result = DirAccess::make_dir_recursive_absolute(p_directory);
+    ERR_FAIL_COND_V_MSG(result != OK, result, "Could not create " + p_directory);
+    PackedStringArray used;
+    for (const Ref<ArrayMesh> &mesh : meshes) {
+        if (mesh.is_null()) {
+            continue;
+        }
+        String file = mesh->get_name().validate_filename();
+        for (int i = 2; used.has(file); i++) {
+            file = mesh->get_name().validate_filename() + "_" + itos(i);
+        }
+        used.push_back(file);
+        const String path = p_directory.path_join(file + ".res");
+        const Error error = ResourceSaver::get_singleton()->save(mesh, path);
+        if (error != OK) {
+            ERR_PRINT("Could not save " + path);
+            result = error;
+            continue;
+        }
+        mesh->take_over_path(path);
+    }
+    return result;
 }
 
 void MujocoImporter::import_actuators(MujocoWorld *p_world)
@@ -867,9 +1034,19 @@ PackedStringArray MujocoImporter::verify(MujocoWorld *p_world, int p_steps)
             continue;
         }
         compare_int("Geom", name, "type", orig->geom_type[i], ours->geom_type[j]);
-        compare("Geom", name, "size", orig->geom_size + 3 * i, ours->geom_size + 3 * j, 3, tolerance);
-        compare("Geom", name, "position", orig->geom_pos + 3 * i, ours->geom_pos + 3 * j, 3, tolerance);
-        compare_quat("Geom", name, orig->geom_quat + 4 * i, ours->geom_quat + 4 * j);
+        if (orig->geom_type[i] == mjGEOM_MESH && ours->geom_type[j] == mjGEOM_MESH) {
+            // A mesh geom's frame is the mesh's principal axes, which a symmetric mesh
+            // doesn't pin down, so compare where the vertices are instead.
+            const std::vector<std::array<double, 3>> a = mesh_geom_points(orig, i), b = mesh_geom_points(ours, j);
+            const double distance = std::max(farthest_point(a, b), farthest_point(b, a));
+            if (distance > tolerance * std::max(1.0, orig->geom_rbound[i])) {
+                add(vformat("Geom '%s' mesh vertices are up to %f apart", name, distance));
+            }
+        } else {
+            compare("Geom", name, "size", orig->geom_size + 3 * i, ours->geom_size + 3 * j, 3, tolerance);
+            compare("Geom", name, "position", orig->geom_pos + 3 * i, ours->geom_pos + 3 * j, 3, tolerance);
+            compare_quat("Geom", name, orig->geom_quat + 4 * i, ours->geom_quat + 4 * j);
+        }
         compare("Geom", name, "friction", orig->geom_friction + 3 * i, ours->geom_friction + 3 * j, 3, tolerance);
         compare_int("Geom", name, "contype", orig->geom_contype[i], ours->geom_contype[j]);
         compare_int("Geom", name, "conaffinity", orig->geom_conaffinity[i], ours->geom_conaffinity[j]);
@@ -991,4 +1168,5 @@ void MujocoImporter::_bind_methods()
     ClassDB::bind_method(D_METHOD("import_string", "xml"), &MujocoImporter::import_string);
     ClassDB::bind_method(D_METHOD("get_report"), &MujocoImporter::get_report);
     ClassDB::bind_method(D_METHOD("verify", "world", "steps"), &MujocoImporter::verify, DEFVAL(1000));
+    ClassDB::bind_method(D_METHOD("save_meshes", "directory"), &MujocoImporter::save_meshes);
 }

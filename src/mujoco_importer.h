@@ -6,6 +6,7 @@
 #include <memory>
 #include <vector>
 
+#include <godot_cpp/classes/array_mesh.hpp>
 #include <godot_cpp/classes/ref_counted.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/packed_string_array.hpp>
@@ -24,6 +25,10 @@ class MujocoElement;
 //
 // What can't be represented yet is left out and listed in get_report(). verify()
 // compiles the imported nodes and compares the result with the original model.
+//
+// Meshes (inline, or STL, OBJ and MSH files, which MuJoCo loads) become ArrayMesh
+// resources in the file's frame, with the mesh's scale applied. They are part of
+// the imported nodes until save_meshes() saves them as files of their own.
 //
 //     var importer := MujocoImporter.new()
 //     var world := importer.import_file("res://robots/arm.xml")
@@ -46,8 +51,15 @@ public:
     // Compares p_world (the last import; it must have compiled, so add it to the
     // scene tree first) with the original model: every imported element's
     // compiled values, then p_steps steps of both simulations. Returns the
-    // differences found, or an empty array.
+    // differences found, or an empty array. Things that tumble or land on each
+    // other can drift apart from rounding alone (the imported values are 32-bit),
+    // so for those the compiled values are what tells.
     godot::PackedStringArray verify(MujocoWorld *p_world, int p_steps = 1000);
+
+    // Saves the last import's meshes into p_directory (created if needed), one
+    // .res file per MuJoCo mesh, named after it. A scene packed afterwards refers
+    // to these files instead of containing the meshes.
+    godot::Error save_meshes(const godot::String &p_directory);
 
 protected:
     static void _bind_methods();
@@ -74,6 +86,8 @@ private:
     void import_sensors(MujocoWorld *p_world);
     void import_excludes(MujocoWorld *p_world);
     void note_unsupported_model_parts();
+    // The ArrayMesh for the original model's mesh p_id, made on first use.
+    godot::Ref<godot::ArrayMesh> mesh_resource(int p_id);
 
     // Adds p_element under p_parent, sets its class if it differs from p_class,
     // and overrides the attributes in p_values that differ from what it inherits.
@@ -94,6 +108,8 @@ private:
     bool main_created = false;
     // For each element of the original model, its node's instance id (0 if left out).
     std::vector<uint64_t> nodes[KIND_COUNT];
+    // By MuJoCo mesh id (null where not used).
+    std::vector<godot::Ref<godot::ArrayMesh>> meshes;
     // Report lines in order, with counts.
     std::vector<std::pair<godot::String, int>> notes;
 };

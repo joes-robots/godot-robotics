@@ -24,6 +24,12 @@
 			<description>
 			</description>
 		</method>
+		<method name="save_meshes">
+			<return type="int" enum="Error" />
+			<param index="0" name="directory" type="String" />
+			<description>
+			</description>
+		</method>
 		<method name="verify">
 			<return type="PackedStringArray" />
 			<param index="0" name="world" type="MujocoWorld" />
