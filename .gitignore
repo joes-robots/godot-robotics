@@ -28,6 +28,8 @@ compile_commands.json
 *.so
 *.so.*
 *.obj
+# ...but not the OBJ meshes the tests import.
+!project/tests/models/meshes/*.obj
 *.bc
 *.pyc
 *.dblite
