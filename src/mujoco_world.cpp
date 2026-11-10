@@ -98,6 +98,23 @@ bool MujocoWorld::_set(const StringName &p_name, const Variant &p_value)
     return true;
 }
 
+void MujocoWorld::set_option(const mjOption &p_option)
+{
+    option = p_option;
+    if (Engine::get_singleton()->is_editor_hint() || !model) {
+        request_compile();
+    } else {
+        model->opt = option;
+        spec->option = option;
+    }
+    notify_property_list_changed();
+}
+
+const mjOption &MujocoWorld::get_option() const
+{
+    return option;
+}
+
 bool MujocoWorld::_get(const StringName &p_name, Variant &r_ret) const
 {
     return mujoco_options::get(option, p_name, r_ret);

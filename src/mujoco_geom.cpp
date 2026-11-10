@@ -176,9 +176,13 @@ static Ref<ArrayMesh> make_ellipsoid_mesh(const Vector3 &p_size)
 
 Ref<Mesh> MujocoGeom::make_shape_mesh(Shape p_shape, const double p_half[3])
 {
-    const double radius = p_half[0];
-    const double height = height_from_half(p_shape, p_half);
-    const Vector3 size = extents_from_half(p_shape, p_half);
+    // Zero sizes (MuJoCo's default class has them) would make degenerate meshes
+    // with undefined normals; draw them tiny instead.
+    const double min_size = 1e-4;
+    const double half[3] = { std::max(p_half[0], min_size), std::max(p_half[1], min_size), std::max(p_half[2], min_size) };
+    const double radius = half[0];
+    const double height = height_from_half(p_shape, half);
+    const Vector3 size = extents_from_half(p_shape, half);
     Ref<Mesh> mesh;
 
     switch (p_shape) {
@@ -225,6 +229,10 @@ Ref<Mesh> MujocoGeom::make_shape_mesh(Shape p_shape, const double p_half[3])
 
 void MujocoGeom::update_shape_mesh()
 {
+    // A class's geom section is never drawn.
+    if (is_class_section()) {
+        return;
+    }
     double half[3];
     get_half_size(half);
     const Ref<Mesh> mesh = make_shape_mesh(get_shape(), half);

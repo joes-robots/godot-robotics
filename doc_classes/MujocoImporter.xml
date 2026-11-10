@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="MujocoImporter" inherits="RefCounted" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+	</brief_description>
+	<description>
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="get_report" qualifiers="const">
+			<return type="PackedStringArray" />
+			<description>
+			</description>
+		</method>
+		<method name="import_file">
+			<return type="MujocoWorld" />
+			<param index="0" name="path" type="String" />
+			<description>
+			</description>
+		</method>
+		<method name="import_string">
+			<return type="MujocoWorld" />
+			<param index="0" name="xml" type="String" />
+			<description>
+			</description>
+		</method>
+		<method name="verify">
+			<return type="PackedStringArray" />
+			<param index="0" name="world" type="MujocoWorld" />
+			<param index="1" name="steps" type="int" default="1000" />
+			<description>
+			</description>
+		</method>
+	</methods>
+</class>

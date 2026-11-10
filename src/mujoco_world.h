@@ -38,6 +38,10 @@ public:
 
     godot::PackedStringArray _get_configuration_warnings() const override;
 
+    // All physics options at once (the option_* properties), e.g. from an imported model.
+    void set_option(const mjOption &p_option);
+    const mjOption &get_option() const;
+
     // Queues one deferred compile; repeated requests in the same frame are merged.
     void request_compile();
     // Runs the queued compile now, if any. Call before reading model/data.
