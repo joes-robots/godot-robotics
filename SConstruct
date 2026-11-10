@@ -45,7 +45,9 @@ Run the following command to download MuJoCo {}:
     scripts/fetch_mujoco.sh""".format(mujoco_version))
     sys.exit(1)
 
-env = SConscript("godot-cpp/SConstruct", {"env": env, "customs": customs})
+# api_version is the oldest Godot API the extension may use; keep it equal to
+# compatibility_minimum in project/bin/mujoco_physics.gdextension.
+env = SConscript("godot-cpp/SConstruct", {"env": env, "customs": customs, "api_version": "4.4"})
 
 env.Append(CPPPATH=["src/"])
 env.Append(CPPPATH=["mujoco/include"])

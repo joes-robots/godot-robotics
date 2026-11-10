@@ -20,11 +20,11 @@ fi
 
 # A fresh checkout has no .godot/ folder, and Godot only loads the extension
 # after the project has been imported once. On Godot 4.7.1 this first import
-# crashes on exit with any godot-cpp 4.4 extension, after the import itself has
+# crashes on exit with any GDExtension (a Godot bug), after the import itself has
 # finished, so its exit code is ignored; a test that can't find the extension's
-# classes fails with a SCRIPT ERROR instead.
-# The subshell keeps bash from reporting the crash.
-( "$godot" --headless --path "$project" --import ) > /dev/null 2>&1 || true
+# classes fails with a SCRIPT ERROR instead. The braces keep bash from printing
+# its own "Aborted" message for the crash.
+{ ( "$godot" --headless --path "$project" --import ) > /dev/null 2>&1; } 2> /dev/null || true
 
 if [[ $# -gt 0 ]]; then
     tests=("$@")
