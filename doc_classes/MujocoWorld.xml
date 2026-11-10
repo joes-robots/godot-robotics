@@ -34,6 +34,8 @@
 		</member>
 		<member name="running" type="bool" setter="set_running" getter="is_running" default="true">
 		</member>
+		<member name="source_file" type="String" setter="set_source_file" getter="get_source_file" default="&quot;&quot;">
+		</member>
 	</members>
 	<signals>
 		<signal name="model_compiled">

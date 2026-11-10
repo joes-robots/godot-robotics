@@ -12,6 +12,11 @@
 			<description>
 			</description>
 		</method>
+		<method name="get_verify_result" qualifiers="const">
+			<return type="PackedStringArray" />
+			<description>
+			</description>
+		</method>
 		<method name="import_file">
 			<return type="MujocoWorld" />
 			<param index="0" name="path" type="String" />
@@ -21,6 +26,20 @@
 		<method name="import_string">
 			<return type="MujocoWorld" />
 			<param index="0" name="xml" type="String" />
+			<description>
+			</description>
+		</method>
+		<method name="import_to_scene">
+			<return type="int" enum="Error" />
+			<param index="0" name="source" type="String" />
+			<param index="1" name="scene_path" type="String" />
+			<param index="2" name="verify_steps" type="int" default="1000" />
+			<description>
+			</description>
+		</method>
+		<method name="mesh_directory_for_scene" qualifiers="static">
+			<return type="String" />
+			<param index="0" name="scene_path" type="String" />
 			<description>
 			</description>
 		</method>

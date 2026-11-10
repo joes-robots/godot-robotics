@@ -319,7 +319,15 @@ Ref<Mesh> MujocoGeom::make_shape_mesh(Shape p_shape, const double p_half[3])
     // Zero sizes (MuJoCo's default class has them) would make degenerate meshes
     // with undefined normals; draw them tiny instead.
     const double min_size = 1e-4;
-    const double half[3] = { std::max(p_half[0], min_size), std::max(p_half[1], min_size), std::max(p_half[2], min_size) };
+    double half[3] = { std::max(p_half[0], min_size), std::max(p_half[1], min_size), std::max(p_half[2], min_size) };
+    // A plane of size 0 is infinite in MuJoCo; draw it 100 m wide.
+    if (p_shape == SHAPE_PLANE) {
+        for (int i = 0; i < 2; i++) {
+            if (p_half[i] <= 0.0) {
+                half[i] = 50.0;
+            }
+        }
+    }
     const double radius = half[0];
     const double height = height_from_half(p_shape, half);
     const Vector3 size = extents_from_half(p_shape, half);

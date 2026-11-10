@@ -32,6 +32,8 @@ class MujocoDefault;
 
 class MujocoWorld : public godot::Node3D {
     GDCLASS(MujocoWorld, godot::Node3D);
+    // verify() compiles an imported world that isn't in the scene tree.
+    friend class MujocoImporter;
 
 public:
     MujocoWorld();
@@ -49,6 +51,11 @@ public:
 
     // The current model as MJCF (MuJoCo XML), or an empty string if nothing has compiled.
     godot::String get_mjcf();
+
+    // The MJCF file this world was imported from (res:// inside the project,
+    // else an absolute path), for "Reload from Source" in the editor.
+    void set_source_file(const godot::String &p_path);
+    godot::String get_source_file() const;
 
     void set_running(bool p_running);
     bool is_running() const;
@@ -144,6 +151,8 @@ private:
 
     // Physics options, copied into each new spec.
     mjOption option;
+
+    godot::String source_file;
 
     // Step the simulation while the game runs.
     bool running = true;

@@ -65,8 +65,12 @@ void MujocoWorld::_bind_methods()
     ClassDB::bind_method(D_METHOD("reset"), &MujocoWorld::reset);
     ClassDB::bind_method(D_METHOD("step", "count"), &MujocoWorld::step, DEFVAL(1));
 
+    ClassDB::bind_method(D_METHOD("set_source_file", "path"), &MujocoWorld::set_source_file);
+    ClassDB::bind_method(D_METHOD("get_source_file"), &MujocoWorld::get_source_file);
+
     ADD_PROPERTY(PropertyInfo(Variant::BOOL, "running"), "set_running", "is_running");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "max_steps_per_frame", PROPERTY_HINT_RANGE, "1,1000,1,or_greater"), "set_max_steps_per_frame", "get_max_steps_per_frame");
+    ADD_PROPERTY(PropertyInfo(Variant::STRING, "source_file", PROPERTY_HINT_GLOBAL_FILE, "*.xml"), "set_source_file", "get_source_file");
 
     // Emitted after every successful compile. At runtime this means the simulation was reset.
     ADD_SIGNAL(MethodInfo("model_compiled"));
@@ -243,8 +247,9 @@ void MujocoWorld::compile()
         }
     }
 
-    // At runtime a recompile resets the simulation: put the bodies back.
-    if (!Engine::get_singleton()->is_editor_hint()) {
+    // At runtime a recompile resets the simulation: put the bodies back. (Outside
+    // the tree, e.g. while MujocoImporter verifies, they are still where they started.)
+    if (!Engine::get_singleton()->is_editor_hint() && is_inside_tree()) {
         sync_bodies();
     }
 
@@ -577,6 +582,16 @@ void MujocoWorld::set_running(bool p_running)
 bool MujocoWorld::is_running() const
 {
     return running;
+}
+
+void MujocoWorld::set_source_file(const String &p_path)
+{
+    source_file = p_path;
+}
+
+String MujocoWorld::get_source_file() const
+{
+    return source_file;
 }
 
 void MujocoWorld::set_max_steps_per_frame(int p_steps)

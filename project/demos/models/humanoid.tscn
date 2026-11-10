@@ -1,0 +1,633 @@
+[gd_scene format=3 uid="uid://c8opg08gqkv6v"]
+
+[node name="Humanoid" type="MujocoWorld" unique_id=65201129]
+source_file = "res://demos/models/humanoid.xml"
+option_timestep = 0.005
+
+[node name="main" type="MujocoDefault" parent="." unique_id=1057637430]
+overrides = {
+"actuator": {
+"ctrl_limited": true
+}
+}
+
+[node name="body" type="MujocoDefault" parent="." unique_id=202759141]
+overrides = {
+"geom": {
+"condim": 1,
+"friction": Vector3(0.7, 0.005, 0.0001),
+"shape": 3,
+"solimp_dmax": 0.99,
+"solimp_width": 0.003,
+"solref_timeconst": 0.015
+},
+"joint": {
+"armature": 0.01,
+"damping": 0.2,
+"limited": true,
+"stiffness": 1.0
+}
+}
+
+[node name="thigh" type="MujocoDefault" parent="body" unique_id=2112629502]
+overrides = {
+"geom": {
+"size0": 0.06
+}
+}
+
+[node name="shin" type="MujocoDefault" parent="body" unique_id=1616177339]
+overrides = {
+"geom": {
+"size0": 0.049
+}
+}
+
+[node name="foot" type="MujocoDefault" parent="body" unique_id=1232230731]
+overrides = {
+"geom": {
+"size0": 0.027
+}
+}
+
+[node name="foot1" type="MujocoDefault" parent="body/foot" unique_id=1140774624]
+
+[node name="foot2" type="MujocoDefault" parent="body/foot" unique_id=1053571191]
+
+[node name="arm_upper" type="MujocoDefault" parent="body" unique_id=1634028805]
+overrides = {
+"geom": {
+"size0": 0.04
+}
+}
+
+[node name="arm_lower" type="MujocoDefault" parent="body" unique_id=2033392871]
+overrides = {
+"geom": {
+"size0": 0.031
+}
+}
+
+[node name="hand" type="MujocoDefault" parent="body" unique_id=1244506780]
+overrides = {
+"geom": {
+"shape": 2,
+"size0": 0.04
+}
+}
+
+[node name="joint_big" type="MujocoDefault" parent="body" unique_id=115530066]
+overrides = {
+"joint": {
+"damping": 5.0,
+"stiffness": 10.0
+}
+}
+
+[node name="hip_x" type="MujocoDefault" parent="body/joint_big" unique_id=1072620703]
+overrides = {
+"joint": {
+"range": Vector2(-0.5235988, 0.17453292)
+}
+}
+
+[node name="hip_z" type="MujocoDefault" parent="body/joint_big" unique_id=1694724116]
+overrides = {
+"joint": {
+"range": Vector2(-1.0471976, 0.61086524)
+}
+}
+
+[node name="hip_y" type="MujocoDefault" parent="body/joint_big" unique_id=211627399]
+overrides = {
+"joint": {
+"range": Vector2(-2.6179938, 0.34906584)
+}
+}
+
+[node name="joint_big_stiff" type="MujocoDefault" parent="body/joint_big" unique_id=1374747390]
+overrides = {
+"joint": {
+"stiffness": 20.0
+}
+}
+
+[node name="knee" type="MujocoDefault" parent="body" unique_id=1744726570]
+overrides = {
+"joint": {
+"range": Vector2(-2.7925267, 0.034906585)
+}
+}
+
+[node name="ankle" type="MujocoDefault" parent="body" unique_id=698622138]
+overrides = {
+"joint": {
+"range": Vector2(-0.87266463, 0.87266463)
+}
+}
+
+[node name="ankle_y" type="MujocoDefault" parent="body/ankle" unique_id=832032471]
+overrides = {
+"joint": {
+"stiffness": 6.0
+}
+}
+
+[node name="ankle_x" type="MujocoDefault" parent="body/ankle" unique_id=110951531]
+overrides = {
+"joint": {
+"stiffness": 3.0
+}
+}
+
+[node name="shoulder" type="MujocoDefault" parent="body" unique_id=1387167342]
+overrides = {
+"joint": {
+"range": Vector2(-1.4835298, 1.0471976)
+}
+}
+
+[node name="elbow" type="MujocoDefault" parent="body" unique_id=427470620]
+overrides = {
+"joint": {
+"range": Vector2(-1.7453293, 0.87266463),
+"stiffness": 0.0
+}
+}
+
+[node name="floor" type="MujocoGeom" parent="." unique_id=1030557241]
+overrides = {
+"color": Color(1, 1, 1, 1),
+"shape": 0,
+"size0": 0.0,
+"size1": 0.0,
+"size2": 0.05
+}
+
+[node name="torso" type="MujocoBody" parent="." unique_id=311396775]
+child_class = &"body"
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.282, 0)
+
+[node name="root" type="MujocoJoint" parent="torso" unique_id=187104623]
+overrides = {
+"armature": 0.0,
+"damping": 0.0,
+"limited": false,
+"stiffness": 0.0,
+"type": 0
+}
+
+[node name="torso" type="MujocoGeom" parent="torso" unique_id=1999287834]
+overrides = {
+"color": Color(0.8, 0.6, 0.4, 1),
+"size0": 0.07,
+"size1": 0.07,
+"size2": 0.0
+}
+transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, 0, 0, 0)
+
+[node name="waist_upper" type="MujocoGeom" parent="torso" unique_id=916121865]
+overrides = {
+"color": Color(0.8, 0.6, 0.4, 1),
+"size0": 0.06,
+"size1": 0.06,
+"size2": 0.0
+}
+transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, -0.01, -0.12, 0)
+
+[node name="head" type="MujocoBody" parent="torso" unique_id=223430621]
+child_class = &"body"
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.19, 0)
+
+[node name="head" type="MujocoGeom" parent="torso/head" unique_id=1547750958]
+overrides = {
+"color": Color(0.8, 0.6, 0.4, 1),
+"shape": 2,
+"size0": 0.09,
+"size1": 0.0,
+"size2": 0.0
+}
+
+[node name="waist_lower" type="MujocoBody" parent="torso" unique_id=1091887113]
+child_class = &"body"
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.01, -0.26, 0)
+
+[node name="abdomen_z" type="MujocoJoint" parent="torso/waist_lower" unique_id=1876035141]
+default_class = &"joint_big_stiff"
+overrides = {
+"range": Vector2(-0.7853982, 0.7853982)
+}
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.065, 0)
+
+[node name="abdomen_z" type="MujocoActuator" parent="torso/waist_lower/abdomen_z" unique_id=214667820]
+default_class = &"main"
+overrides = {
+"gear": 40.0
+}
+
+[node name="abdomen_y" type="MujocoJoint" parent="torso/waist_lower" unique_id=776393707]
+default_class = &"joint_big"
+overrides = {
+"range": Vector2(-1.3089969, 0.5235988)
+}
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, 1, 0, -1, -4.371139e-08, 0, 0.065, 0)
+
+[node name="abdomen_y" type="MujocoActuator" parent="torso/waist_lower/abdomen_y" unique_id=1427170388]
+default_class = &"main"
+overrides = {
+"gear": 40.0
+}
+
+[node name="waist_lower" type="MujocoGeom" parent="torso/waist_lower" unique_id=2044221090]
+overrides = {
+"color": Color(0.8, 0.6, 0.4, 1),
+"size0": 0.06,
+"size1": 0.06,
+"size2": 0.0
+}
+transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, 0, 0, 0)
+
+[node name="pelvis" type="MujocoBody" parent="torso/waist_lower" unique_id=2025537196]
+child_class = &"body"
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.165, 0)
+
+[node name="abdomen_x" type="MujocoJoint" parent="torso/waist_lower/pelvis" unique_id=440372162]
+default_class = &"joint_big"
+overrides = {
+"range": Vector2(-0.61086524, 0.61086524)
+}
+transform = Transform3D(-4.371139e-08, 1, 0, -1, -4.371139e-08, 0, 0, 0, 1, 0, 0.1, 0)
+
+[node name="abdomen_x" type="MujocoActuator" parent="torso/waist_lower/pelvis/abdomen_x" unique_id=801773770]
+default_class = &"main"
+overrides = {
+"gear": 40.0
+}
+
+[node name="butt" type="MujocoGeom" parent="torso/waist_lower/pelvis" unique_id=89107067]
+overrides = {
+"color": Color(0.8, 0.6, 0.4, 1),
+"size0": 0.09,
+"size1": 0.07,
+"size2": 0.0
+}
+transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, -0.02, 0, 0)
+
+[node name="thigh_right" type="MujocoBody" parent="torso/waist_lower/pelvis" unique_id=369893029]
+child_class = &"body"
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.04, 0.1)
+
+[node name="hip_x_right" type="MujocoJoint" parent="torso/waist_lower/pelvis/thigh_right" unique_id=696634388]
+default_class = &"hip_x"
+transform = Transform3D(-4.371139e-08, 1, 0, -1, -4.371139e-08, 0, 0, 0, 1, 0, 0, 0)
+
+[node name="hip_x_right" type="MujocoActuator" parent="torso/waist_lower/pelvis/thigh_right/hip_x_right" unique_id=1625128391]
+default_class = &"main"
+overrides = {
+"gear": 40.0
+}
+
+[node name="hip_z_right" type="MujocoJoint" parent="torso/waist_lower/pelvis/thigh_right" unique_id=1773206947]
+default_class = &"hip_z"
+
+[node name="hip_z_right" type="MujocoActuator" parent="torso/waist_lower/pelvis/thigh_right/hip_z_right" unique_id=981425444]
+default_class = &"main"
+overrides = {
+"gear": 40.0
+}
+
+[node name="hip_y_right" type="MujocoJoint" parent="torso/waist_lower/pelvis/thigh_right" unique_id=729817074]
+default_class = &"hip_y"
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, 1, 0, -1, -4.371139e-08, 0, 0, 0)
+
+[node name="hip_y_right" type="MujocoActuator" parent="torso/waist_lower/pelvis/thigh_right/hip_y_right" unique_id=2036645634]
+default_class = &"main"
+overrides = {
+"gear": 120.0
+}
+
+[node name="thigh_right" type="MujocoGeom" parent="torso/waist_lower/pelvis/thigh_right" unique_id=208650819]
+default_class = &"thigh"
+overrides = {
+"color": Color(0.8, 0.6, 0.4, 1),
+"size1": 0.1700735135169495,
+"size2": 0.0
+}
+transform = Transform3D(1, 0, 0, 0, 0.99956775, -0.029399052, 0, 0.029399052, 0.99956775, 0, -0.17, -0.005)
+
+[node name="shin_right" type="MujocoBody" parent="torso/waist_lower/pelvis/thigh_right" unique_id=849443770]
+child_class = &"body"
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.4, -0.01)
+
+[node name="knee_right" type="MujocoJoint" parent="torso/waist_lower/pelvis/thigh_right/shin_right" unique_id=387171235]
+default_class = &"knee"
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0.02, 0)
+
+[node name="knee_right" type="MujocoActuator" parent="torso/waist_lower/pelvis/thigh_right/shin_right/knee_right" unique_id=795130474]
+default_class = &"main"
+overrides = {
+"gear": 80.0
+}
+
+[node name="shin_right" type="MujocoGeom" parent="torso/waist_lower/pelvis/thigh_right/shin_right" unique_id=1186020136]
+default_class = &"shin"
+overrides = {
+"color": Color(0.8, 0.6, 0.4, 1),
+"size1": 0.15,
+"size2": 0.0
+}
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.15, 0)
+
+[node name="foot_right" type="MujocoBody" parent="torso/waist_lower/pelvis/thigh_right/shin_right" unique_id=1898457568]
+child_class = &"body"
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.39, 0)
+
+[node name="ankle_y_right" type="MujocoJoint" parent="torso/waist_lower/pelvis/thigh_right/shin_right/foot_right" unique_id=701329952]
+default_class = &"ankle_y"
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, 1, 0, -1, -4.371139e-08, 0, 0.08, 0)
+
+[node name="ankle_y_right" type="MujocoActuator" parent="torso/waist_lower/pelvis/thigh_right/shin_right/foot_right/ankle_y_right" unique_id=1980975241]
+default_class = &"main"
+overrides = {
+"gear": 20.0
+}
+
+[node name="ankle_x_right" type="MujocoJoint" parent="torso/waist_lower/pelvis/thigh_right/shin_right/foot_right" unique_id=881770786]
+default_class = &"ankle_x"
+transform = Transform3D(0.44721365, 0.8944272, 0, -0.8944272, 0.44721365, 0, 0, 0, 1, 0, 0.04, 0)
+
+[node name="ankle_x_right" type="MujocoActuator" parent="torso/waist_lower/pelvis/thigh_right/shin_right/foot_right/ankle_x_right" unique_id=187648914]
+default_class = &"main"
+overrides = {
+"gear": 20.0
+}
+
+[node name="foot1_right" type="MujocoGeom" parent="torso/waist_lower/pelvis/thigh_right/shin_right/foot_right" unique_id=2005731919]
+default_class = &"foot1"
+overrides = {
+"color": Color(0.8, 0.6, 0.4, 1),
+"size1": 0.10547511554864494,
+"size2": 0.0
+}
+transform = Transform3D(0.008988738, -0.9954955, -0.094382025, 0.9954955, 0, 0.09480909, -0.094382025, -0.09480909, 0.99101126, 0.035, 0, 0.02)
+
+[node name="foot2_right" type="MujocoGeom" parent="torso/waist_lower/pelvis/thigh_right/shin_right/foot_right" unique_id=1081568516]
+default_class = &"foot2"
+overrides = {
+"color": Color(0.8, 0.6, 0.4, 1),
+"size1": 0.10547511554864494,
+"size2": 0.0
+}
+transform = Transform3D(0.008988738, -0.9954955, 0.094382025, 0.9954955, 0, -0.09480909, 0.094382025, 0.09480909, 0.99101126, 0.035, 0, -0.02)
+
+[node name="thigh_left" type="MujocoBody" parent="torso/waist_lower/pelvis" unique_id=521645314]
+child_class = &"body"
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.04, -0.1)
+
+[node name="hip_x_left" type="MujocoJoint" parent="torso/waist_lower/pelvis/thigh_left" unique_id=1297797319]
+default_class = &"hip_x"
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0, 0, 0)
+
+[node name="hip_x_left" type="MujocoActuator" parent="torso/waist_lower/pelvis/thigh_left/hip_x_left" unique_id=341801044]
+default_class = &"main"
+overrides = {
+"gear": 40.0
+}
+
+[node name="hip_z_left" type="MujocoJoint" parent="torso/waist_lower/pelvis/thigh_left" unique_id=902951891]
+default_class = &"hip_z"
+transform = Transform3D(1, 0, 0, 0, -1, 8.742278e-08, 0, -8.742278e-08, -1, 0, 0, 0)
+
+[node name="hip_z_left" type="MujocoActuator" parent="torso/waist_lower/pelvis/thigh_left/hip_z_left" unique_id=1294692009]
+default_class = &"main"
+overrides = {
+"gear": 40.0
+}
+
+[node name="hip_y_left" type="MujocoJoint" parent="torso/waist_lower/pelvis/thigh_left" unique_id=87377551]
+default_class = &"hip_y"
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, 1, 0, -1, -4.371139e-08, 0, 0, 0)
+
+[node name="hip_y_left" type="MujocoActuator" parent="torso/waist_lower/pelvis/thigh_left/hip_y_left" unique_id=1822282268]
+default_class = &"main"
+overrides = {
+"gear": 120.0
+}
+
+[node name="thigh_left" type="MujocoGeom" parent="torso/waist_lower/pelvis/thigh_left" unique_id=942618053]
+default_class = &"thigh"
+overrides = {
+"color": Color(0.8, 0.6, 0.4, 1),
+"size1": 0.1700735135169495,
+"size2": 0.0
+}
+transform = Transform3D(1, 0, 0, 0, 0.99956775, 0.029399052, 0, -0.029399052, 0.99956775, 0, -0.17, 0.005)
+
+[node name="shin_left" type="MujocoBody" parent="torso/waist_lower/pelvis/thigh_left" unique_id=303996167]
+child_class = &"body"
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.4, 0.01)
+
+[node name="knee_left" type="MujocoJoint" parent="torso/waist_lower/pelvis/thigh_left/shin_left" unique_id=981704571]
+default_class = &"knee"
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0.02, 0)
+
+[node name="knee_left" type="MujocoActuator" parent="torso/waist_lower/pelvis/thigh_left/shin_left/knee_left" unique_id=352620101]
+default_class = &"main"
+overrides = {
+"gear": 80.0
+}
+
+[node name="shin_left" type="MujocoGeom" parent="torso/waist_lower/pelvis/thigh_left/shin_left" unique_id=802169915]
+default_class = &"shin"
+overrides = {
+"color": Color(0.8, 0.6, 0.4, 1),
+"size1": 0.15,
+"size2": 0.0
+}
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.15, 0)
+
+[node name="foot_left" type="MujocoBody" parent="torso/waist_lower/pelvis/thigh_left/shin_left" unique_id=1757939420]
+child_class = &"body"
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.39, 0)
+
+[node name="ankle_y_left" type="MujocoJoint" parent="torso/waist_lower/pelvis/thigh_left/shin_left/foot_left" unique_id=2016878249]
+default_class = &"ankle_y"
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, 1, 0, -1, -4.371139e-08, 0, 0.08, 0)
+
+[node name="ankle_y_left" type="MujocoActuator" parent="torso/waist_lower/pelvis/thigh_left/shin_left/foot_left/ankle_y_left" unique_id=689775074]
+default_class = &"main"
+overrides = {
+"gear": 20.0
+}
+
+[node name="ankle_x_left" type="MujocoJoint" parent="torso/waist_lower/pelvis/thigh_left/shin_left/foot_left" unique_id=1069869198]
+default_class = &"ankle_x"
+transform = Transform3D(-0.44721353, -0.89442724, 0, 0.89442724, -0.44721353, 0, 0, 0, 1, 0, 0.04, 0)
+
+[node name="ankle_x_left" type="MujocoActuator" parent="torso/waist_lower/pelvis/thigh_left/shin_left/foot_left/ankle_x_left" unique_id=376896159]
+default_class = &"main"
+overrides = {
+"gear": 20.0
+}
+
+[node name="foot1_left" type="MujocoGeom" parent="torso/waist_lower/pelvis/thigh_left/shin_left/foot_left" unique_id=1180478164]
+default_class = &"foot1"
+overrides = {
+"color": Color(0.8, 0.6, 0.4, 1),
+"size1": 0.10547511554864494,
+"size2": 0.0
+}
+transform = Transform3D(0.008988738, -0.9954955, -0.094382025, 0.9954955, 0, 0.09480909, -0.094382025, -0.09480909, 0.99101126, 0.035, 0, 0.02)
+
+[node name="foot2_left" type="MujocoGeom" parent="torso/waist_lower/pelvis/thigh_left/shin_left/foot_left" unique_id=931981215]
+default_class = &"foot2"
+overrides = {
+"color": Color(0.8, 0.6, 0.4, 1),
+"size1": 0.10547511554864494,
+"size2": 0.0
+}
+transform = Transform3D(0.008988738, -0.9954955, 0.094382025, 0.9954955, 0, -0.09480909, 0.094382025, 0.09480909, 0.99101126, 0.035, 0, -0.02)
+
+[node name="ContactExclude" type="MujocoContactExclude" parent="torso/waist_lower" unique_id=1588962516]
+body2 = NodePath("../pelvis/thigh_right")
+
+[node name="ContactExclude2" type="MujocoContactExclude" parent="torso/waist_lower" unique_id=71632856]
+body2 = NodePath("../pelvis/thigh_left")
+
+[node name="upper_arm_right" type="MujocoBody" parent="torso" unique_id=1467455720]
+child_class = &"body"
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.06, 0.17)
+
+[node name="shoulder1_right" type="MujocoJoint" parent="torso/upper_arm_right" unique_id=776866966]
+default_class = &"shoulder"
+transform = Transform3D(0.5265986, 0.8164966, 0.23670067, -0.8164966, 0.40824828, 0.4082483, 0.23670067, -0.4082483, 0.8816496, 0, 0, 0)
+
+[node name="shoulder1_right" type="MujocoActuator" parent="torso/upper_arm_right/shoulder1_right" unique_id=433617921]
+default_class = &"main"
+overrides = {
+"gear": 20.0
+}
+
+[node name="shoulder2_right" type="MujocoJoint" parent="torso/upper_arm_right" unique_id=970320440]
+default_class = &"shoulder"
+transform = Transform3D(1, 0, 0, 0, 0.7071068, -0.70710677, 0, 0.70710677, 0.7071068, 0, 0, 0)
+
+[node name="shoulder2_right" type="MujocoActuator" parent="torso/upper_arm_right/shoulder2_right" unique_id=931262665]
+default_class = &"main"
+overrides = {
+"gear": 20.0
+}
+
+[node name="upper_arm_right" type="MujocoGeom" parent="torso/upper_arm_right" unique_id=1945383677]
+default_class = &"arm_upper"
+overrides = {
+"color": Color(0.8, 0.6, 0.4, 1),
+"size1": 0.13856406460551018,
+"size2": 0.0
+}
+transform = Transform3D(0.7886751, -0.57735026, -0.21132486, 0.57735026, 0.57735026, 0.57735026, -0.21132486, -0.57735026, 0.7886751, 0.08, -0.08, 0.08)
+
+[node name="lower_arm_right" type="MujocoBody" parent="torso/upper_arm_right" unique_id=1717619044]
+child_class = &"body"
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.18, -0.18, 0.18)
+
+[node name="elbow_right" type="MujocoJoint" parent="torso/upper_arm_right/lower_arm_right" unique_id=307494771]
+default_class = &"elbow"
+transform = Transform3D(1, 0, 0, 0, 0.7071068, -0.70710677, 0, 0.70710677, 0.7071068, 0, 0, 0)
+
+[node name="elbow_right" type="MujocoActuator" parent="torso/upper_arm_right/lower_arm_right/elbow_right" unique_id=309689400]
+default_class = &"main"
+overrides = {
+"gear": 40.0
+}
+
+[node name="lower_arm_right" type="MujocoGeom" parent="torso/upper_arm_right/lower_arm_right" unique_id=600938846]
+default_class = &"arm_lower"
+overrides = {
+"color": Color(0.8, 0.6, 0.4, 1),
+"size1": 0.13856406460551018,
+"size2": 0.0
+}
+transform = Transform3D(0.21132499, -0.5773502, 0.788675, 0.5773502, -0.57735, -0.5773502, 0.788675, 0.5773502, 0.21132499, 0.09, 0.09, -0.09)
+
+[node name="hand_right" type="MujocoBody" parent="torso/upper_arm_right/lower_arm_right" unique_id=336471459]
+child_class = &"body"
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.18, 0.18, -0.18)
+
+[node name="hand_right" type="MujocoGeom" parent="torso/upper_arm_right/lower_arm_right/hand_right" unique_id=1246498335]
+default_class = &"hand"
+overrides = {
+"color": Color(0.8, 0.6, 0.4, 1),
+"size1": 0.0,
+"size2": 0.0
+}
+transform = Transform3D(0.7886751, 0.57735026, 0.21132486, -0.57735026, 0.57735026, 0.57735026, 0.21132486, -0.57735026, 0.7886751, 0, 0, 0)
+
+[node name="upper_arm_left" type="MujocoBody" parent="torso" unique_id=837511741]
+child_class = &"body"
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.06, -0.17)
+
+[node name="shoulder1_left" type="MujocoJoint" parent="torso/upper_arm_left" unique_id=1850136225]
+default_class = &"shoulder"
+transform = Transform3D(-0.12659863, -0.8164966, -0.56329924, 0.8164966, -0.40824825, 0.4082483, -0.56329924, -0.4082483, 0.7183503, 0, 0, 0)
+
+[node name="shoulder1_left" type="MujocoActuator" parent="torso/upper_arm_left/shoulder1_left" unique_id=850316986]
+default_class = &"main"
+overrides = {
+"gear": 20.0
+}
+
+[node name="shoulder2_left" type="MujocoJoint" parent="torso/upper_arm_left" unique_id=1836543687]
+default_class = &"shoulder"
+transform = Transform3D(1, 0, 0, 0, -0.70710677, -0.70710677, 0, 0.70710677, -0.70710677, 0, 0, 0)
+
+[node name="shoulder2_left" type="MujocoActuator" parent="torso/upper_arm_left/shoulder2_left" unique_id=707503739]
+default_class = &"main"
+overrides = {
+"gear": 20.0
+}
+
+[node name="upper_arm_left" type="MujocoGeom" parent="torso/upper_arm_left" unique_id=1949639594]
+default_class = &"arm_upper"
+overrides = {
+"color": Color(0.8, 0.6, 0.4, 1),
+"size1": 0.13856406460551018,
+"size2": 0.0
+}
+transform = Transform3D(0.7886751, -0.57735026, 0.21132486, 0.57735026, 0.57735026, -0.57735026, 0.21132486, 0.57735026, 0.7886751, 0.08, -0.08, -0.08)
+
+[node name="lower_arm_left" type="MujocoBody" parent="torso/upper_arm_left" unique_id=239540205]
+child_class = &"body"
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.18, -0.18, -0.18)
+
+[node name="elbow_left" type="MujocoJoint" parent="torso/upper_arm_left/lower_arm_left" unique_id=628778832]
+default_class = &"elbow"
+transform = Transform3D(1, 0, 0, 0, -0.70710677, -0.70710677, 0, 0.70710677, -0.70710677, 0, 0, 0)
+
+[node name="elbow_left" type="MujocoActuator" parent="torso/upper_arm_left/lower_arm_left/elbow_left" unique_id=165395499]
+default_class = &"main"
+overrides = {
+"gear": 40.0
+}
+
+[node name="lower_arm_left" type="MujocoGeom" parent="torso/upper_arm_left/lower_arm_left" unique_id=1320035125]
+default_class = &"arm_lower"
+overrides = {
+"color": Color(0.8, 0.6, 0.4, 1),
+"size1": 0.13856406460551018,
+"size2": 0.0
+}
+transform = Transform3D(0.21132499, -0.5773502, -0.788675, 0.5773502, -0.57735, 0.5773502, -0.788675, -0.5773502, 0.21132499, 0.09, 0.09, 0.09)
+
+[node name="hand_left" type="MujocoBody" parent="torso/upper_arm_left/lower_arm_left" unique_id=72052615]
+child_class = &"body"
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.18, 0.18, 0.18)
+
+[node name="hand_left" type="MujocoGeom" parent="torso/upper_arm_left/lower_arm_left/hand_left" unique_id=1816527089]
+default_class = &"hand"
+overrides = {
+"color": Color(0.8, 0.6, 0.4, 1),
+"size1": 0.0,
+"size2": 0.0
+}
+transform = Transform3D(0.7886751, 0.57735026, -0.21132486, -0.57735026, 0.57735026, -0.57735026, -0.21132486, 0.57735026, 0.7886751, 0, 0, 0)

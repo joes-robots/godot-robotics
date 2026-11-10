@@ -15,6 +15,7 @@
 // it the way MuJoCo does. The radius, height and size properties show it in Godot
 // conventions (full extents, total heights). Capsule, cylinder and plane use the
 // node's local Y axis, like Godot's CapsuleMesh, CylinderMesh and PlaneMesh.
+// A plane whose size is 0 is infinite, as in MuJoCo (it is drawn 100 m wide).
 //
 // A capsule's height includes its caps but is stored as the length between them,
 // so a capsule that inherits its height gets longer when its radius grows (as in

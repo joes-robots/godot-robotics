@@ -14,6 +14,7 @@
 #include "mujoco_editor_plugin.h"
 #include "mujoco_element.h"
 #include "mujoco_geom.h"
+#include "mujoco_import_plugin.h"
 #include "mujoco_importer.h"
 #include "mujoco_joint.h"
 #include "mujoco_sensor.h"
@@ -61,7 +62,11 @@ void initialize_gdextension_types(ModuleInitializationLevel p_level)
 		GDREGISTER_INTERNAL_CLASS(MujocoJointGizmoPlugin);
 		GDREGISTER_INTERNAL_CLASS(MujocoSiteGizmoPlugin);
 		GDREGISTER_INTERNAL_CLASS(MujocoEditorPlugin);
+		GDREGISTER_INTERNAL_CLASS(MujocoFileContextMenu);
+		GDREGISTER_INTERNAL_CLASS(MujocoWorldInspector);
+		GDREGISTER_INTERNAL_CLASS(MujocoImportPlugin);
 		EditorPlugins::add_by_type<MujocoEditorPlugin>();
+		EditorPlugins::add_by_type<MujocoImportPlugin>();
 		return;
 	}
 	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
@@ -83,6 +88,7 @@ void initialize_gdextension_types(ModuleInitializationLevel p_level)
 
 void uninitialize_gdextension_types(ModuleInitializationLevel p_level) {
 	if (p_level == MODULE_INITIALIZATION_LEVEL_EDITOR) {
+		EditorPlugins::remove_by_type<MujocoImportPlugin>();
 		EditorPlugins::remove_by_type<MujocoEditorPlugin>();
 		return;
 	}

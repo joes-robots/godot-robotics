@@ -16,6 +16,7 @@
 #include <map>
 
 #include <godot_cpp/classes/dir_access.hpp>
+#include <godot_cpp/classes/packed_scene.hpp>
 #include <godot_cpp/classes/project_settings.hpp>
 #include <godot_cpp/classes/resource_saver.hpp>
 #include <godot_cpp/classes/xml_parser.hpp>
@@ -299,7 +300,11 @@ MujocoWorld *MujocoImporter::import_file(const String &p_path)
         note(vformat("Could not load %s: %s", p_path, error));
         ERR_FAIL_V_MSG(nullptr, vformat("MuJoCo import: could not load %s: %s", p_path, error));
     }
-    return import_spec(parsed);
+    MujocoWorld *world = import_spec(parsed);
+    if (world) {
+        world->set_source_file(ProjectSettings::get_singleton()->localize_path(path));
+    }
+    return world;
 }
 
 MujocoWorld *MujocoImporter::import_string(const String &p_xml)
@@ -574,9 +579,16 @@ void MujocoImporter::import_body_children(mjsBody *p_body, Node *p_node, MujocoW
         values["collision_layer"] = static_cast<int64_t>(m->geom_contype[id]);
         values["collision_mask"] = static_cast<int64_t>(m->geom_conaffinity[id]);
         const float *rgba = m->geom_rgba + 4 * id;
+        const int material = m->geom_matid[id];
+        // MuJoCo draws a geom with a material in the material's color, unless the
+        // geom sets its own (anything but the default gray).
+        const bool default_rgba = rgba[0] == 0.5f && rgba[1] == 0.5f && rgba[2] == 0.5f && rgba[3] == 1.0f;
+        if (material >= 0 && default_rgba) {
+            rgba = m->mat_rgba + 4 * material;
+        }
         values["color"] = Color(rgba[0], rgba[1], rgba[2], rgba[3]);
-        if (m->geom_matid[id] >= 0) {
-            note("Materials and textures are not imported; geoms keep their rgba color");
+        if (material >= 0) {
+            note("Materials and textures are not imported; geoms take their material's color");
         }
         add_contact_values(values, m->geom_condim[id], m->geom_priority[id], m->geom_margin[id], m->geom_gap[id], m->geom_solmix[id],
                 m->geom_solref + mjNREF * id, m->geom_solimp + mjNIMP * id);
@@ -725,6 +737,9 @@ Ref<ArrayMesh> MujocoImporter::mesh_resource(int p_id)
 
 Error MujocoImporter::save_meshes(const String &p_directory)
 {
+    if (!has_meshes()) {
+        return OK;
+    }
     Error result = DirAccess::make_dir_recursive_absolute(p_directory);
     ERR_FAIL_COND_V_MSG(result != OK, result, "Could not create " + p_directory);
     PackedStringArray used;
@@ -747,6 +762,53 @@ Error MujocoImporter::save_meshes(const String &p_directory)
         mesh->take_over_path(path);
     }
     return result;
+}
+
+String MujocoImporter::mesh_directory_for_scene(const String &p_scene_path)
+{
+    return p_scene_path.get_basename() + "_meshes";
+}
+
+bool MujocoImporter::has_meshes() const
+{
+    return std::any_of(meshes.begin(), meshes.end(), [](const Ref<ArrayMesh> &p_mesh) { return p_mesh.is_valid(); });
+}
+
+PackedStringArray MujocoImporter::get_verify_result() const
+{
+    return verify_result;
+}
+
+Error MujocoImporter::import_to_scene(const String &p_source, const String &p_scene_path, int p_verify_steps)
+{
+    verify_result.clear();
+    MujocoWorld *world = import_file(p_source);
+    if (!world) {
+        return ERR_PARSE_ERROR;
+    }
+    Error error = OK;
+    if (has_meshes()) {
+        error = save_meshes(mesh_directory_for_scene(p_scene_path));
+        if (error != OK) {
+            note("Could not save the meshes in " + mesh_directory_for_scene(p_scene_path));
+        }
+    }
+    if (error == OK && p_verify_steps >= 0) {
+        verify_result = verify(world, p_verify_steps);
+    }
+    if (error == OK) {
+        Ref<PackedScene> scene;
+        scene.instantiate();
+        error = scene->pack(world);
+        if (error == OK) {
+            error = ResourceSaver::get_singleton()->save(scene, p_scene_path);
+        }
+        if (error != OK) {
+            note("Could not save the scene " + p_scene_path);
+        }
+    }
+    memdelete(world);
+    return error;
 }
 
 void MujocoImporter::import_actuators(MujocoWorld *p_world)
@@ -936,8 +998,14 @@ PackedStringArray MujocoImporter::verify(MujocoWorld *p_world, int p_steps)
     PackedStringArray diffs;
     ERR_FAIL_NULL_V(p_world, diffs);
     ERR_FAIL_COND_V_MSG(!model, diffs, "Nothing to verify: no model has been imported.");
+    if (!p_world->is_inside_tree() && !p_world->model) {
+        p_world->compile();
+    }
     const mjModel *ours = p_world->get_model();
-    ERR_FAIL_NULL_V_MSG(ours, diffs, "The world has no compiled model; add it to the scene tree first.");
+    if (!ours) {
+        diffs.push_back("The imported world does not compile: " + p_world->compile_error);
+        return diffs;
+    }
     const mjModel *orig = model.get();
     const int max_diffs = 40;
 
@@ -1169,4 +1237,7 @@ void MujocoImporter::_bind_methods()
     ClassDB::bind_method(D_METHOD("get_report"), &MujocoImporter::get_report);
     ClassDB::bind_method(D_METHOD("verify", "world", "steps"), &MujocoImporter::verify, DEFVAL(1000));
     ClassDB::bind_method(D_METHOD("save_meshes", "directory"), &MujocoImporter::save_meshes);
+    ClassDB::bind_method(D_METHOD("import_to_scene", "source", "scene_path", "verify_steps"), &MujocoImporter::import_to_scene, DEFVAL(1000));
+    ClassDB::bind_method(D_METHOD("get_verify_result"), &MujocoImporter::get_verify_result);
+    ClassDB::bind_static_method("MujocoImporter", D_METHOD("mesh_directory_for_scene", "scene_path"), &MujocoImporter::mesh_directory_for_scene);
 }

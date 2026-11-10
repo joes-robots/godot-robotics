@@ -1,0 +1,42 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://demos/humanoid.gd" id="1_script"]
+[ext_resource type="PackedScene" path="res://demos/models/humanoid.tscn" id="2_model"]
+
+[sub_resource type="Environment" id="Environment_sky"]
+background_mode = 1
+background_color = Color(0.3, 0.45, 0.6, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.6, 0.65, 0.7, 1)
+
+[node name="HumanoidDemo" type="Node3D"]
+script = ExtResource("1_script")
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(0.8169679, -0.1473643, 0.5575368, 0, 0.9667991, 0.2555377, -0.5766832, -0.2087661, 0.7898438, 1.2, 1, 1.7)
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.8660254, 0.38302222, -0.32139382, 0, 0.64278764, 0.76604444, 0.5, -0.66341394, 0.5566704, 0, 0, 0)
+shadow_enabled = true
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_sky")
+
+[node name="Humanoid" parent="." instance=ExtResource("2_model")]
+
+[node name="floor" parent="Humanoid" index="2"]
+overrides = {
+"color": Color(0.22, 0.3, 0.38, 1),
+"shape": 0,
+"size0": 0.0,
+"size1": 0.0,
+"size2": 0.05
+}
+
+[node name="Help" type="Label" parent="."]
+offset_left = 16.0
+offset_top = 12.0
+offset_right = 600.0
+offset_bottom = 60.0
+text = "MuJoCo's humanoid, imported from MJCF. Motors off: it falls like a rag doll.
+R: start over."

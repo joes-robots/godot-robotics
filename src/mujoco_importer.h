@@ -32,24 +32,27 @@ class MujocoElement;
 //
 //     var importer := MujocoImporter.new()
 //     var world := importer.import_file("res://robots/arm.xml")
-//     add_child(world)
 //     print(importer.get_report())
 //     print(importer.verify(world))  # [] when the import is faithful
+//     add_child(world)
+//
+// import_to_scene() does all of it and saves the result as a scene; the editor's
+// MJCF import commands use it.
 class MujocoImporter : public godot::RefCounted {
     GDCLASS(MujocoImporter, godot::RefCounted);
 
 public:
     // A new MujocoWorld (not in the scene tree; every node's owner is the world, so
     // it can be packed into a scene), or null if the model doesn't load (the reason
-    // is in get_report()).
+    // is in get_report()). The world's source_file is p_path.
     MujocoWorld *import_file(const godot::String &p_path);
     MujocoWorld *import_string(const godot::String &p_xml);
 
     // What the last import left out or changed, one line per kind of thing.
     godot::PackedStringArray get_report() const;
 
-    // Compares p_world (the last import; it must have compiled, so add it to the
-    // scene tree first) with the original model: every imported element's
+    // Compares p_world (the last import, compiled here if it isn't in the scene
+    // tree yet) with the original model: every imported element's
     // compiled values, then p_steps steps of both simulations. Returns the
     // differences found, or an empty array. Things that tumble or land on each
     // other can drift apart from rounding alone (the imported values are 32-bit),
@@ -60,6 +63,19 @@ public:
     // .res file per MuJoCo mesh, named after it. A scene packed afterwards refers
     // to these files instead of containing the meshes.
     godot::Error save_meshes(const godot::String &p_directory);
+    // Whether the last import made any meshes.
+    bool has_meshes() const;
+
+    // Imports p_source and saves it as the scene p_scene_path (a .tscn or .scn),
+    // with its meshes in the folder mesh_directory_for_scene(p_scene_path). Unless
+    // p_verify_steps is negative, the import is verified first (get_verify_result()).
+    // On failure nothing is saved, and get_report() says why.
+    godot::Error import_to_scene(const godot::String &p_source, const godot::String &p_scene_path, int p_verify_steps = 1000);
+    // What verify() found during the last import_to_scene().
+    godot::PackedStringArray get_verify_result() const;
+    // Where import_to_scene() saves the meshes of p_scene_path: next to it, in
+    // "<scene name>_meshes".
+    static godot::String mesh_directory_for_scene(const godot::String &p_scene_path);
 
 protected:
     static void _bind_methods();
@@ -110,6 +126,7 @@ private:
     std::vector<uint64_t> nodes[KIND_COUNT];
     // By MuJoCo mesh id (null where not used).
     std::vector<godot::Ref<godot::ArrayMesh>> meshes;
+    godot::PackedStringArray verify_result;
     // Report lines in order, with counts.
     std::vector<std::pair<godot::String, int>> notes;
 };
