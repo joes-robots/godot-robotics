@@ -85,6 +85,23 @@ func run() -> void:
 	await run_until(world, 1.5)
 	check_near("the ball rests on the floor", world.get_node("ball").global_position.y, 0.1, 0.01)
 
+	# main holds only what the file's <default> sets, not MuJoCo's built-ins (whose
+	# geom size 0 is a placeholder every geom must replace), so nodes added to the
+	# imported scene get the usual defaults and compile.
+	check("main copies only the file's defaults (%s)" % [main.overrides], main.overrides.keys() == ["joint"])
+	var new_body: MujocoBody = add(world, MujocoBody.new(), "NewBody")
+	new_body.position = Vector3(3, 1, 0)
+	var new_geom: MujocoGeom = add(new_body, MujocoGeom.new(), "NewGeom")
+	var new_site: MujocoSite = add(new_body, MujocoSite.new(), "NewSite")
+	var new_joint: MujocoJoint = add(new_body, MujocoJoint.new(), "NewJoint")
+	await process_frame
+	var added := mjcf_elements(world.get_mjcf())
+	check("a new geom compiles, as a 1 m box", new_geom.shape == MujocoGeom.SHAPE_BOX and added.has("NewBody/NewGeom"))
+	check("with the usual size (%s)" % new_geom.size, new_geom.size.is_equal_approx(Vector3.ONE))
+	check("new sites and joints too", added.has("NewBody/NewSite") and added.has("NewBody/NewJoint"))
+	check_near("a new joint inherits main's damping", new_joint.damping, 0.5, 1e-12)
+	new_body.free()
+
 	# It can be saved as a scene.
 	var scene := PackedScene.new()
 	check("packs into a scene", scene.pack(world) == OK)

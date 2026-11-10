@@ -403,26 +403,38 @@ void MujocoImporter::import_classes(MujocoWorld *p_world)
 
     const bool degree = spec->compiler.degree != 0;
     const bool autolimits = spec->compiler.autolimits != 0;
-    auto apply = [&](MujocoDefault *p_class, mjsDefault *p_def) {
-        const Dictionary sections[] = {
-            joint_values(p_def->joint, degree, autolimits),
-            geom_values(p_def->geom),
-            site_values(p_def->site),
-            actuator_class_values(p_def->actuator, autolimits),
-        };
+    auto class_values = [&](const mjsDefault *p_def, Dictionary r_sections[4]) {
+        r_sections[0] = joint_values(p_def->joint, degree, autolimits);
+        r_sections[1] = geom_values(p_def->geom);
+        r_sections[2] = site_values(p_def->site);
+        r_sections[3] = actuator_class_values(p_def->actuator, autolimits);
+    };
+    // A class overrides only what the file changes from its MuJoCo parent (for
+    // main, MuJoCo's built-in defaults). Built-ins the file leaves alone aren't
+    // copied: some are placeholders, like the geom size 0 that MuJoCo requires
+    // each geom to replace, and would break geoms added to the scene later.
+    // Elements that rely on a built-in override it themselves (add_element).
+    auto apply = [&](MujocoDefault *p_class, const mjsDefault *p_def, const mjsDefault *p_parent) {
+        Dictionary sections[4];
+        Dictionary parent_sections[4];
+        class_values(p_def, sections);
+        class_values(p_parent, parent_sections);
         const char *names[] = { "joint", "geom", "site", "actuator" };
         for (int i = 0; i < 4; i++) {
             MujocoElement *section = p_class->get_section_element(names[i]);
             Dictionary overrides;
             const Array keys = sections[i].keys();
             for (int64_t k = 0; k < keys.size(); k++) {
-                if (!same_value(section->get_attribute(keys[k]), sections[i][keys[k]])) {
-                    overrides[keys[k]] = sections[i][keys[k]];
+                const Variant value = sections[i][keys[k]];
+                const bool changed_in_file = !parent_sections[i].has(keys[k]) || !same_value(parent_sections[i][keys[k]], value);
+                if (changed_in_file && !same_value(section->get_attribute(keys[k]), value)) {
+                    overrides[keys[k]] = value;
                 }
             }
             section->set_overrides(overrides);
         }
     };
+    std::unique_ptr<mjSpec, MjSpecDeleter> builtin(mj_makeSpec());
 
     Ref<XMLParser> parser;
     parser.instantiate();
@@ -431,14 +443,13 @@ void MujocoImporter::import_classes(MujocoWorld *p_world)
     std::memcpy(bytes.ptrw(), buffer.data(), static_cast<size_t>(bytes.size()));
     parser->open_buffer(bytes);
 
-    // The root class: MuJoCo's built-in defaults plus the file's top-level
-    // <default>. A "main" node only if that differs from our base defaults (it
-    // usually does: MuJoCo's default geom is a sphere, ours a box).
+    // The root class: the file's top-level <default>. A "main" node only if that
+    // changes something.
     class_names["main"] = "main";
     MujocoDefault *main = memnew(MujocoDefault);
     main->set_name("main");
     p_world->add_child(main);
-    apply(main, mjs_getSpecDefault(spec.get()));
+    apply(main, mjs_getSpecDefault(spec.get()), mjs_getSpecDefault(builtin.get()));
     if (main->get_overrides().is_empty()) {
         p_world->remove_child(main);
         memdelete(main);
@@ -446,12 +457,14 @@ void MujocoImporter::import_classes(MujocoWorld *p_world)
         main_created = true;
     }
 
-    // The node each open <default> maps to (the world for the root class).
+    // The node each open <default> maps to (the world for the root class), and its class.
     std::vector<Node *> stack;
+    std::vector<const mjsDefault *> def_stack;
     while (parser->read() == OK) {
         if (parser->get_node_type() == XMLParser::NODE_ELEMENT_END) {
             if (parser->get_node_name() == "default" && !stack.empty()) {
                 stack.pop_back();
+                def_stack.pop_back();
             }
             continue;
         }
@@ -460,9 +473,11 @@ void MujocoImporter::import_classes(MujocoWorld *p_world)
         }
         const String mujoco_name = parser->get_named_attribute_value_safe("class");
         Node *node = nullptr;
+        const mjsDefault *node_def = nullptr;
         if (stack.empty() || mujoco_name.is_empty() || mujoco_name == "main") {
             // The root class, handled above; its children are top-level classes.
             node = p_world;
+            node_def = mjs_getSpecDefault(spec.get());
         } else {
             MujocoDefault *cls = memnew(MujocoDefault);
             const String name = mujoco_name.validate_node_name();
@@ -470,8 +485,9 @@ void MujocoImporter::import_classes(MujocoWorld *p_world)
             // Top-level classes sit directly under the world and inherit from main.
             stack.back()->add_child(cls);
             class_names[mujoco_name.utf8().get_data()] = name;
-            if (mjsDefault *def = mjs_findDefault(spec.get(), mujoco_name.utf8().get_data())) {
-                apply(cls, def);
+            node_def = mjs_findDefault(spec.get(), mujoco_name.utf8().get_data());
+            if (node_def) {
+                apply(cls, node_def, def_stack.back());
             }
             node = cls;
         }
@@ -479,6 +495,8 @@ void MujocoImporter::import_classes(MujocoWorld *p_world)
             continue;
         }
         stack.push_back(node);
+        // A class MuJoCo doesn't know (can't happen for a parsed spec) inherits its parent's values.
+        def_stack.push_back(node_def ? node_def : def_stack.back());
     }
 }
 
@@ -522,7 +540,10 @@ void MujocoImporter::import_body_children(mjsBody *p_body, Node *p_node, MujocoW
         Dictionary values;
         values["type"] = static_cast<int64_t>(type);
         values["limited"] = m->jnt_limited[id] != 0;
-        values["range"] = Vector2(m->jnt_range[2 * id], m->jnt_range[2 * id + 1]);
+        // A range only matters when limited (here and for actuators below).
+        if (m->jnt_limited[id]) {
+            values["range"] = Vector2(m->jnt_range[2 * id], m->jnt_range[2 * id + 1]);
+        }
         values["stiffness"] = m->jnt_stiffness[id];
         values["damping"] = m->dof_damping[dof];
         values["armature"] = m->dof_armature[dof];
@@ -848,9 +869,13 @@ void MujocoImporter::import_actuators(MujocoWorld *p_world)
             values["kv"] = gain[0];
         }
         values["ctrl_limited"] = m->actuator_ctrllimited[id] != 0;
-        values["ctrl_range"] = Vector2(m->actuator_ctrlrange[2 * id], m->actuator_ctrlrange[2 * id + 1]);
+        if (m->actuator_ctrllimited[id]) {
+            values["ctrl_range"] = Vector2(m->actuator_ctrlrange[2 * id], m->actuator_ctrlrange[2 * id + 1]);
+        }
         values["force_limited"] = m->actuator_forcelimited[id] != 0;
-        values["force_range"] = Vector2(m->actuator_forcerange[2 * id], m->actuator_forcerange[2 * id + 1]);
+        if (m->actuator_forcelimited[id]) {
+            values["force_range"] = Vector2(m->actuator_forcerange[2 * id], m->actuator_forcerange[2 * id + 1]);
+        }
 
         MujocoActuator *actuator = memnew(MujocoActuator);
         actuator->set_type(type);
