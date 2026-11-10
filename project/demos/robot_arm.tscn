@@ -1,0 +1,194 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://demos/robot_arm.gd" id="1_arm"]
+
+[sub_resource type="StandardMaterial3D" id="TargetMaterial"]
+albedo_color = Color(1, 0.85, 0.1, 1)
+emission_enabled = true
+emission = Color(1, 0.8, 0.1, 1)
+
+[sub_resource type="SphereMesh" id="TargetMesh"]
+material = SubResource("TargetMaterial")
+radius = 0.06
+height = 0.12
+
+[sub_resource type="ProceduralSkyMaterial" id="SkyMaterial"]
+
+[sub_resource type="Sky" id="Sky"]
+sky_material = SubResource("SkyMaterial")
+
+[sub_resource type="Environment" id="Environment"]
+background_mode = 2
+sky = SubResource("Sky")
+ambient_light_source = 3
+tonemap_mode = 2
+
+[node name="RobotArmDemo" type="Node3D"]
+script = ExtResource("1_arm")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment")
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.95630476, 0.2923717, 0, -0.2923717, 0.95630476, -0.7, 3.4, 6.4)
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.8660254, 0.38302222, -0.32139382, 0, 0.64278764, 0.76604444, 0.5, -0.66341394, 0.5566704, 0, 0, 0)
+shadow_enabled = true
+
+[node name="Target" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.05, 1.5, 0)
+mesh = SubResource("TargetMesh")
+
+[node name="Readout" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.4, 3.1, 0)
+billboard = 1
+text = "tip error
+shoulder torque"
+font_size = 64
+outline_size = 16
+
+[node name="MujocoWorld" type="MujocoWorld" parent="."]
+option_integrator = 3
+
+[node name="Floor" type="MujocoGeom" parent="MujocoWorld"]
+shape = 0
+size = Vector3(20, 0, 20)
+color = Color(0.35, 0.37, 0.4, 1)
+
+[node name="Base" type="MujocoBody" parent="MujocoWorld"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0, 0)
+
+[node name="Pedestal" type="MujocoGeom" parent="MujocoWorld/Base"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+shape = 5
+radius = 0.18
+height = 1.0
+color = Color(0.25, 0.27, 0.3, 1)
+
+[node name="Upper" type="MujocoBody" parent="MujocoWorld/Base"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.1, 0)
+
+[node name="Shoulder" type="MujocoJoint" parent="MujocoWorld/Base/Upper"]
+transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, 0, 0, 0)
+armature = 0.05
+
+[node name="Servo" type="MujocoActuator" parent="MujocoWorld/Base/Upper/Shoulder"]
+type = 1
+kp = 4000.0
+kv = 250.0
+force_limited = true
+force_range = Vector2(-150, 150)
+
+[node name="Torque" type="MujocoSensor" parent="MujocoWorld/Base/Upper/Shoulder/Servo"]
+type = 2
+
+[node name="Link" type="MujocoGeom" parent="MujocoWorld/Base/Upper"]
+transform = Transform3D(0, -1, 0, 1, 0, 0, 0, 0, 1, 0.5, 0, 0)
+shape = 3
+radius = 0.06
+height = 1.12
+density = 200.0
+color = Color(0.95, 0.55, 0.15, 1)
+
+[node name="Lower" type="MujocoBody" parent="MujocoWorld/Base/Upper"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0)
+
+[node name="Elbow" type="MujocoJoint" parent="MujocoWorld/Base/Upper/Lower"]
+transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, 0, 0, 0)
+armature = 0.05
+
+[node name="Servo" type="MujocoActuator" parent="MujocoWorld/Base/Upper/Lower/Elbow"]
+type = 1
+kp = 1500.0
+kv = 60.0
+force_limited = true
+force_range = Vector2(-80, 80)
+
+[node name="Link" type="MujocoGeom" parent="MujocoWorld/Base/Upper/Lower"]
+transform = Transform3D(0, -1, 0, 1, 0, 0, 0, 0, 1, 0.5, 0, 0)
+shape = 3
+radius = 0.05
+height = 1.1
+density = 200.0
+color = Color(0.2, 0.5, 0.95, 1)
+
+[node name="Tip" type="MujocoSite" parent="MujocoWorld/Base/Upper/Lower"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0)
+
+[node name="Position" type="MujocoSensor" parent="MujocoWorld/Base/Upper/Lower/Tip"]
+type = 3
+
+[node name="Stirrer" type="MujocoBody" parent="MujocoWorld"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 0.35, 0)
+mocap = true
+
+[node name="Geom" type="MujocoGeom" parent="MujocoWorld/Stirrer"]
+shape = 5
+radius = 0.2
+height = 0.6
+color = Color(0.9, 0.2, 0.25, 1)
+
+[node name="PenNorth" type="MujocoGeom" parent="MujocoWorld"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 0.3, -2.1)
+size = Vector3(4.4, 0.6, 0.2)
+color = Color(0.5, 0.52, 0.55, 1)
+
+[node name="PenSouth" type="MujocoGeom" parent="MujocoWorld"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 0.3, 2.1)
+size = Vector3(4.4, 0.6, 0.2)
+color = Color(0.5, 0.52, 0.55, 1)
+
+[node name="PenEast" type="MujocoGeom" parent="MujocoWorld"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.9, 0.3, 0)
+size = Vector3(0.2, 0.6, 4.4)
+color = Color(0.5, 0.52, 0.55, 1)
+
+[node name="PenWest" type="MujocoGeom" parent="MujocoWorld"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.1, 0.3, 0)
+size = Vector3(0.2, 0.6, 4.4)
+color = Color(0.5, 0.52, 0.55, 1)
+
+[node name="Ball1" type="MujocoBody" parent="MujocoWorld"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.8, 0.2, 0.8)
+
+[node name="Free" type="MujocoJoint" parent="MujocoWorld/Ball1"]
+type = 0
+
+[node name="Geom" type="MujocoGeom" parent="MujocoWorld/Ball1"]
+shape = 2
+radius = 0.2
+color = Color(0.3, 0.8, 0.45, 1)
+
+[node name="Ball2" type="MujocoBody" parent="MujocoWorld"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.2, 0.2, -0.9)
+
+[node name="Free" type="MujocoJoint" parent="MujocoWorld/Ball2"]
+type = 0
+
+[node name="Geom" type="MujocoGeom" parent="MujocoWorld/Ball2"]
+shape = 2
+radius = 0.2
+color = Color(0.95, 0.8, 0.2, 1)
+
+[node name="Ball3" type="MujocoBody" parent="MujocoWorld"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.5, 0.2, -1.1)
+
+[node name="Free" type="MujocoJoint" parent="MujocoWorld/Ball3"]
+type = 0
+
+[node name="Geom" type="MujocoGeom" parent="MujocoWorld/Ball3"]
+shape = 2
+radius = 0.2
+color = Color(0.6, 0.4, 0.9, 1)
+
+[node name="Ball4" type="MujocoBody" parent="MujocoWorld"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.6, 0.2, 1.2)
+
+[node name="Free" type="MujocoJoint" parent="MujocoWorld/Ball4"]
+type = 0
+
+[node name="Geom" type="MujocoGeom" parent="MujocoWorld/Ball4"]
+shape = 2
+radius = 0.2
+color = Color(0.3, 0.75, 0.9, 1)
