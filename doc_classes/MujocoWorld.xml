@@ -1,11 +1,35 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<class name="MujocoSpec" inherits="Node" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+<class name="MujocoWorld" inherits="Node3D" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
 	<brief_description>
 	</brief_description>
 	<description>
 	</description>
 	<tutorials>
 	</tutorials>
+	<methods>
+		<method name="get_mjcf">
+			<return type="String" />
+			<description>
+			</description>
+		</method>
+		<method name="get_simulation_time" qualifiers="const">
+			<return type="float" />
+			<description>
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="max_steps_per_frame" type="int" setter="set_max_steps_per_frame" getter="get_max_steps_per_frame" default="100">
+		</member>
+		<member name="running" type="bool" setter="set_running" getter="is_running" default="true">
+		</member>
+	</members>
+	<signals>
+		<signal name="model_compiled">
+			<description>
+			</description>
+		</signal>
+	</signals>
 	<constants>
 		<constant name="INTEGRATOR_EULER" value="0" enum="Integrator">
 		</constant>

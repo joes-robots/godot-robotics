@@ -80,3 +80,14 @@ jobs:
         with:
           scons-cache: ${{ github.workspace }}/.scons-cache/
           cache-name: ${{ matrix.target.platform }}_${{ matrix.target.arch }}_${{ matrix.float-precision }}_${{ matrix.target-type }}
+
+      # Run the headless tests (after saving the cache, so a failing test doesn't discard it)
+      - name: Fetch Godot
+        shell: bash
+        run: |
+          godot="$(scripts/fetch_godot.sh "$RUNNER_TEMP/godot")"
+          echo "GODOT=$godot" >> "$GITHUB_ENV"
+
+      - name: Run tests
+        shell: bash
+        run: scripts/run_tests.sh

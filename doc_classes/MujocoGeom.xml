@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="MujocoGeom" inherits="MujocoElement" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+	</brief_description>
+	<description>
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="collision_layer" type="int" setter="set_collision_layer" getter="get_collision_layer" default="1">
+		</member>
+		<member name="collision_mask" type="int" setter="set_collision_mask" getter="get_collision_mask" default="1">
+		</member>
+		<member name="color" type="Color" setter="set_color" getter="get_color" default="Color(0.5, 0.5, 0.5, 1)">
+		</member>
+		<member name="density" type="float" setter="set_density" getter="get_density" default="1000.0">
+		</member>
+		<member name="friction" type="Vector3" setter="set_friction" getter="get_friction" default="Vector3(1, 0.005, 0.0001)">
+		</member>
+		<member name="height" type="float" setter="set_height" getter="get_height" default="2.0">
+		</member>
+		<member name="mass" type="float" setter="set_mass" getter="get_mass" default="0.0">
+		</member>
+		<member name="radius" type="float" setter="set_radius" getter="get_radius" default="0.5">
+		</member>
+		<member name="shape" type="int" setter="set_shape" getter="get_shape" enum="MujocoGeom.Shape" default="6">
+		</member>
+		<member name="show_shape" type="bool" setter="set_show_shape" getter="is_showing_shape" default="true">
+		</member>
+		<member name="size" type="Vector3" setter="set_size" getter="get_size" default="Vector3(1, 1, 1)">
+		</member>
+	</members>
+	<constants>
+		<constant name="SHAPE_PLANE" value="0" enum="Shape">
+		</constant>
+		<constant name="SHAPE_SPHERE" value="2" enum="Shape">
+		</constant>
+		<constant name="SHAPE_CAPSULE" value="3" enum="Shape">
+		</constant>
+		<constant name="SHAPE_ELLIPSOID" value="4" enum="Shape">
+		</constant>
+		<constant name="SHAPE_CYLINDER" value="5" enum="Shape">
+		</constant>
+		<constant name="SHAPE_BOX" value="6" enum="Shape">
+		</constant>
+	</constants>
+</class>

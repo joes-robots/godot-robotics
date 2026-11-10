@@ -3,10 +3,16 @@
 #include <gdextension_interface.h>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/core/defs.hpp>
+#include <godot_cpp/classes/editor_plugin_registration.hpp>
 #include <godot_cpp/godot.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
-#include "mujoco_spec.h"
+#include "mujoco_body.h"
+#include "mujoco_editor_plugin.h"
+#include "mujoco_element.h"
+#include "mujoco_geom.h"
+#include "mujoco_joint.h"
+#include "mujoco_world.h"
 #include <mujoco/mujoco.h>
 
 using namespace godot;
@@ -42,14 +48,30 @@ static void mujoco_log_handler(const mjLogMessage *p_msg)
 
 void initialize_gdextension_types(ModuleInitializationLevel p_level)
 {
+	if (p_level == MODULE_INITIALIZATION_LEVEL_EDITOR) {
+		// Only reached in editor builds of Godot (never in exported games). The plugin
+		// itself is only instantiated when the editor UI is running.
+		GDREGISTER_INTERNAL_CLASS(MujocoGeomGizmoPlugin);
+		GDREGISTER_INTERNAL_CLASS(MujocoEditorPlugin);
+		EditorPlugins::add_by_type<MujocoEditorPlugin>();
+		return;
+	}
 	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
 		return;
 	}
 	previous_mujoco_log_handler = mju_setLogHandler(mujoco_log_handler);
-	GDREGISTER_CLASS(MujocoSpec);
+	GDREGISTER_CLASS(MujocoWorld);
+	GDREGISTER_ABSTRACT_CLASS(MujocoElement);
+	GDREGISTER_CLASS(MujocoBody);
+	GDREGISTER_CLASS(MujocoGeom);
+	GDREGISTER_CLASS(MujocoJoint);
 }
 
 void uninitialize_gdextension_types(ModuleInitializationLevel p_level) {
+	if (p_level == MODULE_INITIALIZATION_LEVEL_EDITOR) {
+		EditorPlugins::remove_by_type<MujocoEditorPlugin>();
+		return;
+	}
 	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
 		return;
 	}

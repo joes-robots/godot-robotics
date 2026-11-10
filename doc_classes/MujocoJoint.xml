@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="MujocoJoint" inherits="MujocoElement" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+	</brief_description>
+	<description>
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="armature" type="float" setter="set_armature" getter="get_armature" default="0.0">
+		</member>
+		<member name="damping" type="float" setter="set_damping" getter="get_damping" default="0.0">
+		</member>
+		<member name="frictionloss" type="float" setter="set_frictionloss" getter="get_frictionloss" default="0.0">
+		</member>
+		<member name="limited" type="bool" setter="set_limited" getter="is_limited" default="false">
+		</member>
+		<member name="range" type="Vector2" setter="set_range" getter="get_range" default="Vector2(-90, 90)">
+		</member>
+		<member name="stiffness" type="float" setter="set_stiffness" getter="get_stiffness" default="0.0">
+		</member>
+		<member name="type" type="int" setter="set_type" getter="get_type" enum="MujocoJoint.Type" default="3">
+		</member>
+	</members>
+	<constants>
+		<constant name="TYPE_FREE" value="0" enum="Type">
+		</constant>
+		<constant name="TYPE_BALL" value="1" enum="Type">
+		</constant>
+		<constant name="TYPE_SLIDE" value="2" enum="Type">
+		</constant>
+		<constant name="TYPE_HINGE" value="3" enum="Type">
+		</constant>
+	</constants>
+</class>

@@ -2,4 +2,8 @@
 
 [node name="main" type="Node" unique_id=1425169268]
 
-[node name="MujocoSpec" type="MujocoSpec" parent="." unique_id=372829669 groups=["mujoco"]]
+[node name="MujocoWorld" type="MujocoWorld" parent="." unique_id=372829669]
+
+[node name="MujocoBody" type="MujocoBody" parent="MujocoWorld" unique_id=1734679282]
+
+[node name="MujocoGeom" type="MujocoGeom" parent="MujocoWorld/MujocoBody" unique_id=2059671322]
