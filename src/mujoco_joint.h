@@ -10,6 +10,9 @@
 // The node's position is the joint anchor and its local Y axis is the hinge or
 // slide axis (MuJoCo's default joint axis, local z, converted to Godot). Free
 // joints ignore both and must belong to a body whose parent is the world.
+//
+// Joint positions are measured from the pose in the scene, which is position 0.
+// Positive hinge rotation follows the right-hand rule about the axis.
 class MujocoJoint : public MujocoElement {
     GDCLASS(MujocoJoint, MujocoElement);
 
@@ -40,17 +43,27 @@ public:
     void set_frictionloss(double p_frictionloss);
     double get_frictionloss() const;
 
+    // Simulation state of a hinge (radians, rad/s) or slide (meters, m/s) joint.
+    // Readable whenever the model has compiled; settable only while the game runs.
+    double get_joint_position();
+    void set_joint_position(double p_position);
+    double get_joint_velocity();
+    void set_joint_velocity(double p_velocity);
+
 protected:
     static void _bind_methods();
     void _validate_property(godot::PropertyInfo &p_property) const;
 
 private:
     void changed();
+    // Index of this joint's value in qpos and qvel. Fails (with an error) for ball
+    // and free joints, which have no single value, or if the model hasn't compiled.
+    bool get_state_index(int &r_qpos, int &r_dof);
 
     Type type = TYPE_HINGE;
     bool limited = false;
-    // Hinge: degrees. Slide: meters. Ball: only y is used (maximum angle in degrees).
-    godot::Vector2 range{ -90, 90 };
+    // Hinge: radians. Slide: meters. Ball: only y is used (maximum angle in radians).
+    godot::Vector2 range = godot::Vector2(-godot::Math::PI / 2, godot::Math::PI / 2);
     double damping = 0.0;      // force (or torque) per unit velocity
     double stiffness = 0.0;    // spring force (or torque) per unit displacement
     double armature = 0.0;     // extra rotor inertia (or mass for slide)

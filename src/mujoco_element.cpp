@@ -32,6 +32,24 @@ void MujocoElement::request_compile() const
     }
 }
 
+int MujocoElement::get_model_id(mjtObj p_type)
+{
+    MujocoWorld *world = get_world();
+    if (!world) {
+        return -1;
+    }
+    const mjModel *model = world->get_model();
+    if (!model) {
+        return -1;
+    }
+    // Element names are node paths relative to the world (see MujocoWorld::add_subtree).
+    if (cached_generation != world->get_model_generation()) {
+        cached_id = mj_name2id(model, p_type, String(world->get_path_to(this)).utf8().get_data());
+        cached_generation = world->get_model_generation();
+    }
+    return cached_id;
+}
+
 PackedStringArray MujocoElement::_get_configuration_warnings() const
 {
     PackedStringArray warnings = Node3D::_get_configuration_warnings();

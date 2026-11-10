@@ -59,21 +59,29 @@ void MujocoWorld::_bind_methods()
     ClassDB::bind_method(D_METHOD("set_max_steps_per_frame", "steps"), &MujocoWorld::set_max_steps_per_frame);
     ClassDB::bind_method(D_METHOD("get_max_steps_per_frame"), &MujocoWorld::get_max_steps_per_frame);
     ClassDB::bind_method(D_METHOD("get_simulation_time"), &MujocoWorld::get_simulation_time);
+    ClassDB::bind_method(D_METHOD("reset"), &MujocoWorld::reset);
+    ClassDB::bind_method(D_METHOD("step", "count"), &MujocoWorld::step, DEFVAL(1));
 
     ADD_PROPERTY(PropertyInfo(Variant::BOOL, "running"), "set_running", "is_running");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "max_steps_per_frame", PROPERTY_HINT_RANGE, "1,1000,1,or_greater"), "set_max_steps_per_frame", "get_max_steps_per_frame");
 
     // Emitted after every successful compile. At runtime this means the simulation was reset.
     ADD_SIGNAL(MethodInfo("model_compiled"));
+    // Emitted before every MuJoCo step (option_timestep apart), for controllers that
+    // should run at the simulation's rate rather than the frame rate.
+    ADD_SIGNAL(MethodInfo("pre_step"));
 }
 
 bool MujocoWorld::_set(const StringName &p_name, const Variant &p_value)
 {
-    bool changed = false;
-    if (!mujoco_options::set(option, p_name, p_value, changed)) {
+    // Returning true means "this property is ours", not "the value was stored":
+    // returning false would make Godot report the property as nonexistent.
+    bool accepted = false;
+    if (!mujoco_options::set(option, p_name, p_value, accepted)) {
         return false;
     }
-    if (!changed) {
+    if (!accepted) {
+        // Invalid value: already reported by mujoco_options::set, option left unchanged.
         return true;
     }
     if (Engine::get_singleton()->is_editor_hint()) {
@@ -142,6 +150,8 @@ void MujocoWorld::compile()
     const CharString model_name = String(get_name()).utf8();
     mjs_setString(new_spec->modelname, model_name.get_data());
     new_spec->option = option;
+    // Angles (joint ranges) are given in radians, like everywhere in Godot's API.
+    new_spec->compiler.degree = 0;
     building_bodies.clear();
     add_subtree(this, new_spec.get(), mjs_findBody(new_spec.get(), "world"), Transform3D());
 
@@ -175,6 +185,7 @@ void MujocoWorld::compile()
     spec = std::move(new_spec);
     body_nodes = std::move(new_body_nodes);
     step_accumulator = 0.0;
+    model_generation++;
 
     // At runtime a recompile resets the simulation: put the bodies back.
     if (!Engine::get_singleton()->is_editor_hint()) {
@@ -231,7 +242,7 @@ void MujocoWorld::step_simulation(double p_delta)
     const double threshold = timestep * (1.0 - 1e-6);
     int steps = 0;
     while (step_accumulator >= threshold && steps < max_steps_per_frame) {
-        mj_step(model.get(), data.get());
+        step_once();
         step_accumulator -= timestep;
         steps++;
     }
@@ -243,6 +254,71 @@ void MujocoWorld::step_simulation(double p_delta)
     if (steps > 0) {
         // mj_step leaves body poses one step behind the state; bring them up to date.
         mj_kinematics(model.get(), data.get());
+        sync_bodies();
+    }
+}
+
+void MujocoWorld::step_once()
+{
+    emit_signal("pre_step");
+    // A pre_step handler may have caused a compile (by reading state while one was
+    // queued), so read the pointers only now.
+    if (!model || !data) {
+        return;
+    }
+    stepping = true;
+    mj_step(model.get(), data.get());
+    stepping = false;
+}
+
+void MujocoWorld::reset()
+{
+    flush_compile();
+    ERR_FAIL_COND_MSG(!model || !data, "Nothing to reset: the model has not compiled.");
+    mj_resetData(model.get(), data.get());
+    step_accumulator = 0.0;
+    state_changed();
+}
+
+void MujocoWorld::step(int p_count)
+{
+    ERR_FAIL_COND_MSG(Engine::get_singleton()->is_editor_hint(), "step() only works while the game runs.");
+    ERR_FAIL_COND_MSG(p_count < 1, "step() needs a count of at least 1.");
+    flush_compile();
+    ERR_FAIL_COND_MSG(!model || !data, "Nothing to step: the model has not compiled.");
+    for (int i = 0; i < p_count; i++) {
+        step_once();
+    }
+    if (model && data) {
+        mj_kinematics(model.get(), data.get());
+        sync_bodies();
+    }
+}
+
+mjModel *MujocoWorld::get_model()
+{
+    flush_compile();
+    return model.get();
+}
+
+mjData *MujocoWorld::get_data()
+{
+    flush_compile();
+    return data.get();
+}
+
+uint64_t MujocoWorld::get_model_generation() const
+{
+    return model_generation;
+}
+
+void MujocoWorld::state_changed()
+{
+    if (stepping || !model || !data) {
+        return;
+    }
+    mj_forward(model.get(), data.get());
+    if (!Engine::get_singleton()->is_editor_hint()) {
         sync_bodies();
     }
 }

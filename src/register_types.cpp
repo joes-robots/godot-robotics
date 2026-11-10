@@ -52,6 +52,7 @@ void initialize_gdextension_types(ModuleInitializationLevel p_level)
 		// Only reached in editor builds of Godot (never in exported games). The plugin
 		// itself is only instantiated when the editor UI is running.
 		GDREGISTER_INTERNAL_CLASS(MujocoGeomGizmoPlugin);
+		GDREGISTER_INTERNAL_CLASS(MujocoJointGizmoPlugin);
 		GDREGISTER_INTERNAL_CLASS(MujocoEditorPlugin);
 		EditorPlugins::add_by_type<MujocoEditorPlugin>();
 		return;

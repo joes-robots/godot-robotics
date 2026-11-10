@@ -3,6 +3,8 @@
 #include "mujoco_convert.h"
 #include "mujoco_world.h"
 
+#include <godot_cpp/classes/engine.hpp>
+
 using namespace godot;
 
 mjsBody *MujocoJoint::add_to_spec(mjSpec * /*p_spec*/, mjsBody *p_body, const Transform3D &p_transform, const String &p_name)
@@ -23,7 +25,7 @@ mjsBody *MujocoJoint::add_to_spec(mjSpec * /*p_spec*/, mjsBody *p_body, const Tr
     // The node's local Y axis, expressed in the body's frame.
     mujoco_convert::to_mujoco(p_transform.basis.xform(Vector3(0, 1, 0)).normalized(), joint->axis);
 
-    // The spec's compiler uses degrees (MuJoCo's default), matching the range units.
+    // The world's compiler takes radians, matching the range units.
     joint->limited = limited ? mjLIMITED_TRUE : mjLIMITED_FALSE;
     joint->range[0] = type == TYPE_BALL ? 0.0 : range.x;
     joint->range[1] = range.y;
@@ -58,7 +60,60 @@ PackedStringArray MujocoJoint::_get_configuration_warnings() const
 void MujocoJoint::changed()
 {
     update_configuration_warnings();
+    update_gizmos();
     request_compile();
+}
+
+bool MujocoJoint::get_state_index(int &r_qpos, int &r_dof)
+{
+    ERR_FAIL_COND_V_MSG(type == TYPE_FREE || type == TYPE_BALL, false,
+            "Only hinge and slide joints have a single position and velocity.");
+    const int id = get_model_id(mjOBJ_JOINT);
+    ERR_FAIL_COND_V_MSG(id < 0, false, "This joint is not part of a compiled MuJoCo model.");
+    const mjModel *model = get_world()->get_model();
+    r_qpos = model->jnt_qposadr[id];
+    r_dof = model->jnt_dofadr[id];
+    return true;
+}
+
+double MujocoJoint::get_joint_position()
+{
+    int qpos = 0, dof = 0;
+    if (!get_state_index(qpos, dof)) {
+        return 0.0;
+    }
+    return get_world()->get_data()->qpos[qpos];
+}
+
+void MujocoJoint::set_joint_position(double p_position)
+{
+    ERR_FAIL_COND_MSG(Engine::get_singleton()->is_editor_hint(), "Joint positions can only be set while the game runs.");
+    int qpos = 0, dof = 0;
+    if (!get_state_index(qpos, dof)) {
+        return;
+    }
+    get_world()->get_data()->qpos[qpos] = p_position;
+    get_world()->state_changed();
+}
+
+double MujocoJoint::get_joint_velocity()
+{
+    int qpos = 0, dof = 0;
+    if (!get_state_index(qpos, dof)) {
+        return 0.0;
+    }
+    return get_world()->get_data()->qvel[dof];
+}
+
+void MujocoJoint::set_joint_velocity(double p_velocity)
+{
+    ERR_FAIL_COND_MSG(Engine::get_singleton()->is_editor_hint(), "Joint velocities can only be set while the game runs.");
+    int qpos = 0, dof = 0;
+    if (!get_state_index(qpos, dof)) {
+        return;
+    }
+    get_world()->get_data()->qvel[dof] = p_velocity;
+    get_world()->state_changed();
 }
 
 void MujocoJoint::_validate_property(PropertyInfo &p_property) const
@@ -73,7 +128,8 @@ void MujocoJoint::_validate_property(PropertyInfo &p_property) const
         if (!has_axis || !limited) {
             p_property.usage = PROPERTY_USAGE_NO_EDITOR;
         }
-        p_property.hint_string = type == TYPE_SLIDE ? "suffix:m" : "suffix:deg";
+        // Stored in radians and shown in degrees, like Node3D.rotation.
+        p_property.hint_string = type == TYPE_SLIDE ? "-10,10,0.001,or_less,or_greater,suffix:m" : "-360,360,0.1,or_less,or_greater,radians_as_degrees";
     }
 }
 
@@ -98,10 +154,14 @@ void MujocoJoint::_bind_methods()
     ClassDB::bind_method(D_METHOD("get_armature"), &MujocoJoint::get_armature);
     ClassDB::bind_method(D_METHOD("set_frictionloss", "frictionloss"), &MujocoJoint::set_frictionloss);
     ClassDB::bind_method(D_METHOD("get_frictionloss"), &MujocoJoint::get_frictionloss);
+    ClassDB::bind_method(D_METHOD("get_joint_position"), &MujocoJoint::get_joint_position);
+    ClassDB::bind_method(D_METHOD("set_joint_position", "position"), &MujocoJoint::set_joint_position);
+    ClassDB::bind_method(D_METHOD("get_joint_velocity"), &MujocoJoint::get_joint_velocity);
+    ClassDB::bind_method(D_METHOD("set_joint_velocity", "velocity"), &MujocoJoint::set_joint_velocity);
 
     ADD_PROPERTY(PropertyInfo(Variant::INT, "type", PROPERTY_HINT_ENUM, "Free:0,Ball:1,Slide:2,Hinge:3"), "set_type", "get_type");
     ADD_PROPERTY(PropertyInfo(Variant::BOOL, "limited"), "set_limited", "is_limited");
-    ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "range"), "set_range", "get_range");
+    ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "range", PROPERTY_HINT_RANGE, "-360,360,0.1,or_less,or_greater,radians_as_degrees"), "set_range", "get_range");
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "damping", PROPERTY_HINT_RANGE, "0,100,0.001,or_greater"), "set_damping", "get_damping");
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "stiffness", PROPERTY_HINT_RANGE, "0,1000,0.001,or_greater"), "set_stiffness", "get_stiffness");
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "armature", PROPERTY_HINT_RANGE, "0,10,0.0001,or_greater"), "set_armature", "get_armature");

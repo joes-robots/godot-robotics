@@ -6,6 +6,30 @@
 	</description>
 	<tutorials>
 	</tutorials>
+	<methods>
+		<method name="get_joint_position">
+			<return type="float" />
+			<description>
+			</description>
+		</method>
+		<method name="get_joint_velocity">
+			<return type="float" />
+			<description>
+			</description>
+		</method>
+		<method name="set_joint_position">
+			<return type="void" />
+			<param index="0" name="position" type="float" />
+			<description>
+			</description>
+		</method>
+		<method name="set_joint_velocity">
+			<return type="void" />
+			<param index="0" name="velocity" type="float" />
+			<description>
+			</description>
+		</method>
+	</methods>
 	<members>
 		<member name="armature" type="float" setter="set_armature" getter="get_armature" default="0.0">
 		</member>
@@ -15,7 +39,7 @@
 		</member>
 		<member name="limited" type="bool" setter="set_limited" getter="is_limited" default="false">
 		</member>
-		<member name="range" type="Vector2" setter="set_range" getter="get_range" default="Vector2(-90, 90)">
+		<member name="range" type="Vector2" setter="set_range" getter="get_range" default="Vector2(-1.5707964, 1.5707964)">
 		</member>
 		<member name="stiffness" type="float" setter="set_stiffness" getter="get_stiffness" default="0.0">
 		</member>

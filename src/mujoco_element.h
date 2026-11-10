@@ -36,4 +36,13 @@ protected:
 
     // Call whenever something that affects the compiled model changes.
     void request_compile() const;
+
+    // This element's id in its world's current model (running a queued compile
+    // first), or -1 if it isn't part of a compiled model.
+    int get_model_id(mjtObj p_type);
+
+private:
+    // Cache for get_model_id(), valid while the world's model generation matches.
+    uint64_t cached_generation = 0;
+    int cached_id = -1;
 };

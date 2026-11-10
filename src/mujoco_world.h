@@ -48,8 +48,24 @@ public:
     bool is_running() const;
     void set_max_steps_per_frame(int p_steps);
     int get_max_steps_per_frame() const;
-    // Simulated time in seconds since the last compile (which resets the simulation).
+    // Simulated time in seconds since the last compile or reset().
     double get_simulation_time() const;
+
+    // Puts the simulation back in its initial state: time 0, the scene's poses, no motion.
+    void reset();
+    // Runs p_count MuJoCo steps right away, whether or not `running` is set.
+    // Only while the game runs.
+    void step(int p_count = 1);
+
+    // For MujocoElements. The current model and data (running a queued compile
+    // first), or nullptr if nothing has compiled. Valid until the next compile.
+    mjModel *get_model();
+    mjData *get_data();
+    // Increases with every successful compile, so elements can cache model ids.
+    uint64_t get_model_generation() const;
+    // Call after writing simulation state (qpos, qvel) outside of stepping:
+    // updates the derived quantities and, while the game runs, the body nodes.
+    void state_changed();
 
 protected:
     // Godot built-ins
@@ -73,6 +89,8 @@ private:
     void add_subtree(godot::Node *p_node, mjSpec *p_spec, mjsBody *p_body, const godot::Transform3D &p_to_body);
     // Advances the simulation by p_delta seconds of game time.
     void step_simulation(double p_delta);
+    // One MuJoCo step, preceded by the pre_step signal.
+    void step_once();
     // Writes the simulated body poses into the MujocoBody nodes.
     void sync_bodies();
     void report_compile_error(const godot::String &p_error);
@@ -95,6 +113,10 @@ private:
     int max_steps_per_frame = 100;
     // Game time not yet simulated, always less than one timestep after a frame.
     double step_accumulator = 0.0;
+    // Inside step_once(); mj_step recomputes everything, so state_changed() can skip work.
+    bool stepping = false;
+    // See get_model_generation(); 0 means nothing has compiled yet.
+    uint64_t model_generation = 0;
 
     // Bodies collected while building a spec, as (spec body, node instance id).
     std::vector<std::pair<mjsBody *, uint64_t>> building_bodies;

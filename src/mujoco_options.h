@@ -18,9 +18,9 @@ void get_property_list(godot::List<godot::PropertyInfo> *p_list);
 bool get(const mjOption &p_option, const godot::StringName &p_name, godot::Variant &r_value);
 
 // Returns false if p_name is not an option property. An invalid value is
-// rejected with an error and leaves p_option untouched; r_changed reports
-// whether p_option was written.
-bool set(mjOption &p_option, const godot::StringName &p_name, const godot::Variant &p_value, bool &r_changed);
+// rejected with an error and leaves p_option untouched; r_accepted reports
+// whether the value was valid and written to p_option.
+bool set(mjOption &p_option, const godot::StringName &p_name, const godot::Variant &p_value, bool &r_accepted);
 
 // MuJoCo's default for the property (from mj_defaultOption). Returns false if
 // p_name is not an option property.

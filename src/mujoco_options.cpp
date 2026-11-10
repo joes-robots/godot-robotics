@@ -274,13 +274,13 @@ bool get(const mjOption &p_option, const StringName &p_name, Variant &r_value) {
     return true;
 }
 
-bool set(mjOption &p_option, const StringName &p_name, const Variant &p_value, bool &r_changed) {
-    r_changed = false;
+bool set(mjOption &p_option, const StringName &p_name, const Variant &p_value, bool &r_accepted) {
+    r_accepted = false;
     const Field *field = find(p_name);
     if (!field) {
         return false;
     }
-    r_changed = write(p_option, *field, p_value);
+    r_accepted = write(p_option, *field, p_value);
     return true;
 }
 

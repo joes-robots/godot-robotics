@@ -23,6 +23,23 @@ protected:
     static void _bind_methods() {}
 };
 
+// Draws each MujocoJoint as lines showing its type and axis (the node's local Y),
+// with an arrowhead for the positive direction. The lines are also clickable.
+class MujocoJointGizmoPlugin : public godot::EditorNode3DGizmoPlugin {
+    GDCLASS(MujocoJointGizmoPlugin, godot::EditorNode3DGizmoPlugin);
+
+public:
+    bool _has_gizmo(godot::Node3D *p_node) const override;
+    godot::String _get_gizmo_name() const override;
+    void _redraw(const godot::Ref<godot::EditorNode3DGizmo> &p_gizmo) override;
+
+protected:
+    static void _bind_methods() {}
+
+private:
+    bool material_created = false;
+};
+
 // Registers the editor additions above while the editor is running.
 class MujocoEditorPlugin : public godot::EditorPlugin {
     GDCLASS(MujocoEditorPlugin, godot::EditorPlugin);
@@ -36,4 +53,5 @@ protected:
 
 private:
     godot::Ref<MujocoGeomGizmoPlugin> geom_gizmo_plugin;
+    godot::Ref<MujocoJointGizmoPlugin> joint_gizmo_plugin;
 };

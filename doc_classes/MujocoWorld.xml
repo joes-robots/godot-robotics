@@ -17,6 +17,17 @@
 			<description>
 			</description>
 		</method>
+		<method name="reset">
+			<return type="void" />
+			<description>
+			</description>
+		</method>
+		<method name="step">
+			<return type="void" />
+			<param index="0" name="count" type="int" default="1" />
+			<description>
+			</description>
+		</method>
 	</methods>
 	<members>
 		<member name="max_steps_per_frame" type="int" setter="set_max_steps_per_frame" getter="get_max_steps_per_frame" default="100">
@@ -26,6 +37,10 @@
 	</members>
 	<signals>
 		<signal name="model_compiled">
+			<description>
+			</description>
+		</signal>
+		<signal name="pre_step">
 			<description>
 			</description>
 		</signal>
