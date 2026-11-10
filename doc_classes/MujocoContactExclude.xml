@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="MujocoContactExclude" inherits="MujocoElement" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+	</brief_description>
+	<description>
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="body1" type="NodePath" setter="set_body1" getter="get_body1" default="NodePath(&quot;..&quot;)">
+		</member>
+		<member name="body2" type="NodePath" setter="set_body2" getter="get_body2" default="NodePath(&quot;&quot;)">
+		</member>
+	</members>
+</class>

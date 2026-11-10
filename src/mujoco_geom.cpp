@@ -29,6 +29,19 @@ const MujocoAttribute GEOM_ATTRIBUTES[] = {
     { "collision_layer", Variant::INT, { 1 } },
     { "collision_mask", Variant::INT, { 1 } },
     { "color", Variant::COLOR, { 0.5, 0.5, 0.5, 1.0 } },
+    // Contact parameters, with MuJoCo's defaults.
+    { "condim", Variant::INT, { 3 } },
+    { "priority", Variant::INT, { 0 } },
+    { "margin", Variant::FLOAT, { 0.0 } },
+    { "gap", Variant::FLOAT, { 0.0 } },
+    { "solmix", Variant::FLOAT, { 1.0 } },
+    { "solref_timeconst", Variant::FLOAT, { 0.02 } },
+    { "solref_dampratio", Variant::FLOAT, { 1.0 } },
+    { "solimp_dmin", Variant::FLOAT, { 0.9 } },
+    { "solimp_dmax", Variant::FLOAT, { 0.95 } },
+    { "solimp_width", Variant::FLOAT, { 0.001 } },
+    { "solimp_midpoint", Variant::FLOAT, { 0.5 } },
+    { "solimp_power", Variant::FLOAT, { 2.0 } },
 };
 const MujocoAttributeTable GEOM_TABLE = MUJOCO_ATTRIBUTE_TABLE(GEOM_ATTRIBUTES);
 
@@ -117,6 +130,18 @@ void MujocoGeom::write_attributes(mjsGeom *p_geom) const
     p_geom->rgba[1] = color.g;
     p_geom->rgba[2] = color.b;
     p_geom->rgba[3] = color.a;
+    p_geom->condim = get_condim();
+    p_geom->priority = get_priority();
+    p_geom->margin = get_margin();
+    p_geom->gap = get_gap();
+    p_geom->solmix = get_solmix();
+    p_geom->solref[0] = get_solref_timeconst();
+    p_geom->solref[1] = get_solref_dampratio();
+    p_geom->solimp[0] = get_solimp_dmin();
+    p_geom->solimp[1] = get_solimp_dmax();
+    p_geom->solimp[2] = get_solimp_width();
+    p_geom->solimp[3] = get_solimp_midpoint();
+    p_geom->solimp[4] = get_solimp_power();
 }
 
 void MujocoGeom::write_class_defaults(mjsDefault *p_default)
@@ -299,6 +324,30 @@ void MujocoGeom::_bind_methods()
     ClassDB::bind_method(D_METHOD("get_collision_layer"), &MujocoGeom::get_collision_layer);
     ClassDB::bind_method(D_METHOD("set_collision_mask", "mask"), &MujocoGeom::set_collision_mask);
     ClassDB::bind_method(D_METHOD("get_collision_mask"), &MujocoGeom::get_collision_mask);
+    ClassDB::bind_method(D_METHOD("set_condim", "value"), &MujocoGeom::set_condim);
+    ClassDB::bind_method(D_METHOD("get_condim"), &MujocoGeom::get_condim);
+    ClassDB::bind_method(D_METHOD("set_priority", "value"), &MujocoGeom::set_priority);
+    ClassDB::bind_method(D_METHOD("get_priority"), &MujocoGeom::get_priority);
+    ClassDB::bind_method(D_METHOD("set_solmix", "value"), &MujocoGeom::set_solmix);
+    ClassDB::bind_method(D_METHOD("get_solmix"), &MujocoGeom::get_solmix);
+    ClassDB::bind_method(D_METHOD("set_solref_timeconst", "value"), &MujocoGeom::set_solref_timeconst);
+    ClassDB::bind_method(D_METHOD("get_solref_timeconst"), &MujocoGeom::get_solref_timeconst);
+    ClassDB::bind_method(D_METHOD("set_solref_dampratio", "value"), &MujocoGeom::set_solref_dampratio);
+    ClassDB::bind_method(D_METHOD("get_solref_dampratio"), &MujocoGeom::get_solref_dampratio);
+    ClassDB::bind_method(D_METHOD("set_solimp_dmin", "value"), &MujocoGeom::set_solimp_dmin);
+    ClassDB::bind_method(D_METHOD("get_solimp_dmin"), &MujocoGeom::get_solimp_dmin);
+    ClassDB::bind_method(D_METHOD("set_solimp_dmax", "value"), &MujocoGeom::set_solimp_dmax);
+    ClassDB::bind_method(D_METHOD("get_solimp_dmax"), &MujocoGeom::get_solimp_dmax);
+    ClassDB::bind_method(D_METHOD("set_solimp_width", "value"), &MujocoGeom::set_solimp_width);
+    ClassDB::bind_method(D_METHOD("get_solimp_width"), &MujocoGeom::get_solimp_width);
+    ClassDB::bind_method(D_METHOD("set_solimp_midpoint", "value"), &MujocoGeom::set_solimp_midpoint);
+    ClassDB::bind_method(D_METHOD("get_solimp_midpoint"), &MujocoGeom::get_solimp_midpoint);
+    ClassDB::bind_method(D_METHOD("set_solimp_power", "value"), &MujocoGeom::set_solimp_power);
+    ClassDB::bind_method(D_METHOD("get_solimp_power"), &MujocoGeom::get_solimp_power);
+    ClassDB::bind_method(D_METHOD("set_margin", "value"), &MujocoGeom::set_margin);
+    ClassDB::bind_method(D_METHOD("get_margin"), &MujocoGeom::get_margin);
+    ClassDB::bind_method(D_METHOD("set_gap", "value"), &MujocoGeom::set_gap);
+    ClassDB::bind_method(D_METHOD("get_gap"), &MujocoGeom::get_gap);
     ClassDB::bind_method(D_METHOD("set_color", "color"), &MujocoGeom::set_color);
     ClassDB::bind_method(D_METHOD("get_color"), &MujocoGeom::get_color);
     ClassDB::bind_method(D_METHOD("set_show_shape", "show"), &MujocoGeom::set_show_shape);
@@ -318,6 +367,20 @@ void MujocoGeom::_bind_methods()
     ADD_PROPERTY(PropertyInfo(Variant::VECTOR3, "friction", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_EDITOR), "set_friction", "get_friction");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "collision_layer", PROPERTY_HINT_LAYERS_3D_PHYSICS, "", PROPERTY_USAGE_EDITOR), "set_collision_layer", "get_collision_layer");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "collision_mask", PROPERTY_HINT_LAYERS_3D_PHYSICS, "", PROPERTY_USAGE_EDITOR), "set_collision_mask", "get_collision_mask");
+
+    ADD_PROPERTY(PropertyInfo(Variant::INT, "condim", PROPERTY_HINT_ENUM, "Frictionless:1,Sliding Friction:3,Torsional Friction:4,Rolling Friction:6", PROPERTY_USAGE_EDITOR), "set_condim", "get_condim");
+    ADD_PROPERTY(PropertyInfo(Variant::INT, "priority", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_EDITOR), "set_priority", "get_priority");
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "margin", PROPERTY_HINT_RANGE, "0,1,0.0001,or_greater,suffix:m", PROPERTY_USAGE_EDITOR), "set_margin", "get_margin");
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "gap", PROPERTY_HINT_RANGE, "0,1,0.0001,or_greater,suffix:m", PROPERTY_USAGE_EDITOR), "set_gap", "get_gap");
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "solmix", PROPERTY_HINT_RANGE, "0,10,0.001,or_greater", PROPERTY_USAGE_EDITOR), "set_solmix", "get_solmix");
+    ADD_SUBGROUP("Solver", "");
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "solref_timeconst", PROPERTY_HINT_RANGE, "0.0001,1,0.0001,or_greater,or_less,suffix:s", PROPERTY_USAGE_EDITOR), "set_solref_timeconst", "get_solref_timeconst");
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "solref_dampratio", PROPERTY_HINT_RANGE, "0,2,0.001,or_greater,or_less", PROPERTY_USAGE_EDITOR), "set_solref_dampratio", "get_solref_dampratio");
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "solimp_dmin", PROPERTY_HINT_RANGE, "0.0001,0.9999,0.0001", PROPERTY_USAGE_EDITOR), "set_solimp_dmin", "get_solimp_dmin");
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "solimp_dmax", PROPERTY_HINT_RANGE, "0.0001,0.9999,0.0001", PROPERTY_USAGE_EDITOR), "set_solimp_dmax", "get_solimp_dmax");
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "solimp_width", PROPERTY_HINT_RANGE, "0,1,0.0001,or_greater,suffix:m", PROPERTY_USAGE_EDITOR), "set_solimp_width", "get_solimp_width");
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "solimp_midpoint", PROPERTY_HINT_RANGE, "0,1,0.001", PROPERTY_USAGE_EDITOR), "set_solimp_midpoint", "get_solimp_midpoint");
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "solimp_power", PROPERTY_HINT_RANGE, "1,10,0.01,or_greater", PROPERTY_USAGE_EDITOR), "set_solimp_power", "get_solimp_power");
 
     ADD_GROUP("Display", "");
     ADD_PROPERTY(PropertyInfo(Variant::COLOR, "color", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_EDITOR), "set_color", "get_color");
@@ -427,6 +490,45 @@ void MujocoGeom::set_collision_mask(uint32_t p_mask)
 }
 
 uint32_t MujocoGeom::get_collision_mask() const { return static_cast<uint32_t>(static_cast<int64_t>(get_attribute("collision_mask"))); }
+
+void MujocoGeom::set_condim(int p_condim)
+{
+    ERR_FAIL_COND_MSG(p_condim != 1 && p_condim != 3 && p_condim != 4 && p_condim != 6, "condim must be 1, 3, 4 or 6.");
+    set_attribute("condim", p_condim);
+    changed();
+}
+
+int MujocoGeom::get_condim() const { return static_cast<int>(static_cast<int64_t>(get_attribute("condim"))); }
+
+void MujocoGeom::set_priority(int p_priority)
+{
+    set_attribute("priority", p_priority);
+    changed();
+}
+
+int MujocoGeom::get_priority() const { return static_cast<int>(static_cast<int64_t>(get_attribute("priority"))); }
+
+// The other contact parameters are plain numbers, checked by MuJoCo's compiler.
+#define GEOM_NUMBER_ATTRIBUTE(m_name) \
+    void MujocoGeom::set_##m_name(double p_value) \
+    { \
+        set_attribute(#m_name, p_value); \
+        changed(); \
+    } \
+    double MujocoGeom::get_##m_name() const { return get_attribute(#m_name); }
+
+GEOM_NUMBER_ATTRIBUTE(solmix)
+GEOM_NUMBER_ATTRIBUTE(solref_timeconst)
+GEOM_NUMBER_ATTRIBUTE(solref_dampratio)
+GEOM_NUMBER_ATTRIBUTE(solimp_dmin)
+GEOM_NUMBER_ATTRIBUTE(solimp_dmax)
+GEOM_NUMBER_ATTRIBUTE(solimp_width)
+GEOM_NUMBER_ATTRIBUTE(solimp_midpoint)
+GEOM_NUMBER_ATTRIBUTE(solimp_power)
+GEOM_NUMBER_ATTRIBUTE(margin)
+GEOM_NUMBER_ATTRIBUTE(gap)
+
+#undef GEOM_NUMBER_ATTRIBUTE
 
 void MujocoGeom::set_color(const Color &p_color)
 {

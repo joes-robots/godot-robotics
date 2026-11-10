@@ -57,6 +57,32 @@ public:
     uint32_t get_collision_layer() const;
     void set_collision_mask(uint32_t p_mask);
     uint32_t get_collision_mask() const;
+    // Contact parameters (MuJoCo's names; see its documentation for details).
+    // condim: 1 frictionless, 3 sliding friction, 4 adds torsional, 6 adds rolling.
+    void set_condim(int p_condim);
+    int get_condim() const;
+    void set_priority(int p_priority);
+    int get_priority() const;
+    void set_solmix(double p_value);
+    double get_solmix() const;
+    void set_solref_timeconst(double p_value);
+    double get_solref_timeconst() const;
+    void set_solref_dampratio(double p_value);
+    double get_solref_dampratio() const;
+    void set_solimp_dmin(double p_value);
+    double get_solimp_dmin() const;
+    void set_solimp_dmax(double p_value);
+    double get_solimp_dmax() const;
+    void set_solimp_width(double p_value);
+    double get_solimp_width() const;
+    void set_solimp_midpoint(double p_value);
+    double get_solimp_midpoint() const;
+    void set_solimp_power(double p_value);
+    double get_solimp_power() const;
+    void set_margin(double p_value);
+    double get_margin() const;
+    void set_gap(double p_value);
+    double get_gap() const;
     void set_color(const godot::Color &p_color);
     godot::Color get_color() const;
     void set_show_shape(bool p_show);
@@ -94,7 +120,8 @@ private:
     // Attributes (see mujoco_element.h): shape; size0, size1, size2 (MuJoCo's size
     // parameters); density (kg/m^3, used when mass is 0); mass (kg); friction
     // (slide, spin, roll); collision_layer and collision_mask (MuJoCo's contype and
-    // conaffinity); color.
+    // conaffinity); color; and the contact parameters condim, priority, margin,
+    // gap, solmix, solref_* and solimp_* (MuJoCo's solref and solimp, by name).
     bool show_shape = true;
 
     // Internal child drawing the shape; not saved with the scene.

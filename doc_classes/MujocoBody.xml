@@ -56,7 +56,17 @@
 		</method>
 	</methods>
 	<members>
+		<member name="center_of_mass" type="Vector3" setter="set_center_of_mass" getter="get_center_of_mass" default="Vector3(0, 0, 0)">
+		</member>
 		<member name="child_class" type="StringName" setter="set_child_class" getter="get_child_class" default="&amp;&quot;&quot;">
+		</member>
+		<member name="explicit_inertia" type="bool" setter="set_explicit_inertia" getter="has_explicit_inertia" default="false">
+		</member>
+		<member name="inertia" type="Vector3" setter="set_inertia" getter="get_inertia" default="Vector3(0.01, 0.01, 0.01)">
+		</member>
+		<member name="inertia_orientation" type="Quaternion" setter="set_inertia_orientation" getter="get_inertia_orientation" default="Quaternion(0, 0, 0, 1)">
+		</member>
+		<member name="mass" type="float" setter="set_mass" getter="get_mass" default="1.0">
 		</member>
 		<member name="mocap" type="bool" setter="set_mocap" getter="is_mocap" default="false">
 		</member>

@@ -1,6 +1,7 @@
 #include "mujoco_importer.h"
 #include "mujoco_actuator.h"
 #include "mujoco_body.h"
+#include "mujoco_contact_exclude.h"
 #include "mujoco_convert.h"
 #include "mujoco_default.h"
 #include "mujoco_geom.h"
@@ -8,6 +9,7 @@
 #include "mujoco_sensor.h"
 #include "mujoco_site.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 
@@ -111,7 +113,27 @@ Dictionary joint_values(const mjsJoint *p_joint, bool p_degree, bool p_autolimit
     values["stiffness"] = p_joint->stiffness[0];
     values["armature"] = p_joint->armature;
     values["frictionloss"] = p_joint->frictionloss;
+    values["ref"] = p_joint->ref * scale;
+    values["springref"] = p_joint->springref * scale;
     return values;
+}
+
+// The contact attributes of a geom, from its solver parameters.
+void add_contact_values(Dictionary &r_values, int p_condim, int p_priority, double p_margin, double p_gap, double p_solmix,
+        const mjtNum *p_solref, const mjtNum *p_solimp)
+{
+    r_values["condim"] = static_cast<int64_t>(p_condim);
+    r_values["priority"] = static_cast<int64_t>(p_priority);
+    r_values["margin"] = p_margin;
+    r_values["gap"] = p_gap;
+    r_values["solmix"] = p_solmix;
+    r_values["solref_timeconst"] = p_solref[0];
+    r_values["solref_dampratio"] = p_solref[1];
+    r_values["solimp_dmin"] = p_solimp[0];
+    r_values["solimp_dmax"] = p_solimp[1];
+    r_values["solimp_width"] = p_solimp[2];
+    r_values["solimp_midpoint"] = p_solimp[3];
+    r_values["solimp_power"] = p_solimp[4];
 }
 
 Dictionary geom_values(const mjsGeom *p_geom)
@@ -129,6 +151,7 @@ Dictionary geom_values(const mjsGeom *p_geom)
     values["collision_layer"] = static_cast<int64_t>(p_geom->contype);
     values["collision_mask"] = static_cast<int64_t>(p_geom->conaffinity);
     values["color"] = Color(p_geom->rgba[0], p_geom->rgba[1], p_geom->rgba[2], p_geom->rgba[3]);
+    add_contact_values(values, p_geom->condim, p_geom->priority, p_geom->margin, p_geom->gap, p_geom->solmix, p_geom->solref, p_geom->solimp);
     return values;
 }
 
@@ -274,6 +297,7 @@ MujocoWorld *MujocoImporter::import_spec(mjSpec *p_spec)
     import_body_children(mjs_findBody(spec.get(), "world"), world, world, "main");
     import_actuators(world);
     import_sensors(world);
+    import_excludes(world);
     note_unsupported_model_parts();
 
     set_owner_recursive(world, world);
@@ -453,14 +477,18 @@ void MujocoImporter::import_body_children(mjsBody *p_body, Node *p_node, MujocoW
         values["damping"] = m->dof_damping[dof];
         values["armature"] = m->dof_armature[dof];
         values["frictionloss"] = m->dof_frictionloss[dof];
+        if (type == mjJNT_HINGE || type == mjJNT_SLIDE) {
+            values["ref"] = m->qpos0[qpos];
+            values["springref"] = m->qpos_spring[qpos];
+        }
+        const mjtNum *solref = m->jnt_solref + mjNREF * id;
+        const mjtNum *solimp = m->jnt_solimp + mjNIMP * id;
+        if (m->jnt_margin[id] != 0.0 || solref[0] != 0.02 || solref[1] != 1.0 || solimp[0] != 0.9 || solimp[1] != 0.95 ||
+                solimp[2] != 0.001 || solimp[3] != 0.5 || solimp[4] != 2.0) {
+            note("Joint limit solver parameters (solreflimit, solimplimit, margin) are not supported yet; MuJoCo's defaults are used");
+        }
         if (type == mjJNT_FREE && (m->dof_damping[dof] != 0.0 || m->dof_armature[dof] != 0.0 || m->dof_frictionloss[dof] != 0.0)) {
             note("Free joint damping, armature and friction loss are not imported");
-        }
-        if ((type == mjJNT_HINGE || type == mjJNT_SLIDE) && m->qpos0[qpos] != 0.0) {
-            note("Joint ref (a reference position other than the pose in the file) is not supported yet; those joints start at the file's pose");
-        }
-        if ((type == mjJNT_HINGE || type == mjJNT_SLIDE) && m->qpos_spring[qpos] != m->qpos0[qpos]) {
-            note("Joint springref is not supported yet; springs rest at the file's pose");
         }
         add_element(joint, p_node, node_name(el, "Joint"), el, p_class, values, p_world);
         nodes[KIND_JOINT][id] = joint->get_instance_id();
@@ -493,13 +521,8 @@ void MujocoImporter::import_body_children(mjsBody *p_body, Node *p_node, MujocoW
         if (m->geom_matid[id] >= 0) {
             note("Materials and textures are not imported; geoms keep their rgba color");
         }
-        const mjtNum *solref = m->geom_solref + mjNREF * id;
-        const mjtNum *solimp = m->geom_solimp + mjNIMP * id;
-        if (m->geom_condim[id] != 3 || m->geom_priority[id] != 0 || m->geom_margin[id] != 0.0 || m->geom_gap[id] != 0.0 ||
-                solref[0] != 0.02 || solref[1] != 1.0 || solimp[0] != 0.9 || solimp[1] != 0.95 || solimp[2] != 0.001 ||
-                solimp[3] != 0.5 || solimp[4] != 2.0) {
-            note("Geom contact parameters (condim, priority, margin, gap, solref, solimp) are not supported yet; MuJoCo's defaults are used");
-        }
+        add_contact_values(values, m->geom_condim[id], m->geom_priority[id], m->geom_margin[id], m->geom_gap[id], m->geom_solmix[id],
+                m->geom_solref + mjNREF * id, m->geom_solimp + mjNIMP * id);
         add_element(geom, p_node, node_name(el, "Geom"), el, p_class, values, p_world);
         nodes[KIND_GEOM][id] = geom->get_instance_id();
     }
@@ -540,7 +563,15 @@ void MujocoImporter::import_body_children(mjsBody *p_body, Node *p_node, MujocoW
             body->set_child_class(child_class);
         }
         if (spec_body->explicitinertial) {
-            note("Explicit body inertia (<inertial>) is not supported yet; mass comes from the geoms");
+            // The compiled inertia is diagonal, in a frame given by ipos and iquat.
+            const Transform3D frame = mujoco_convert::to_godot(m->body_ipos + 3 * id, m->body_iquat + 4 * id);
+            const mjtNum *inertia = m->body_inertia + 3 * id;
+            body->set_explicit_inertia(true);
+            body->set_mass(m->body_mass[id]);
+            body->set_center_of_mass(frame.origin);
+            body->set_inertia_orientation(frame.basis.get_rotation_quaternion());
+            // MuJoCo's x, y, z moments are about Godot's x, -z, y axes of that frame.
+            body->set_inertia(Vector3(inertia[0], inertia[2], inertia[1]));
         }
         if (m->body_gravcomp[id] != 0.0) {
             note("Gravity compensation is not supported yet");
@@ -684,6 +715,30 @@ void MujocoImporter::import_sensors(MujocoWorld *p_world)
     }
 }
 
+void MujocoImporter::import_excludes(MujocoWorld *p_world)
+{
+    for (mjsElement *el = mjs_firstElement(spec.get(), mjOBJ_EXCLUDE); el; el = mjs_nextElement(spec.get(), el)) {
+        const mjsExclude *spec_exclude = mjs_asExclude(el);
+        const int id1 = mj_name2id(model.get(), mjOBJ_BODY, mjs_getString(spec_exclude->bodyname1));
+        const int id2 = mj_name2id(model.get(), mjOBJ_BODY, mjs_getString(spec_exclude->bodyname2));
+        // Body 0 is the world.
+        Node *body1 = id1 == 0 ? static_cast<Node *>(p_world) : node_of<Node>(nodes[KIND_BODY], id1);
+        Node *body2 = id2 == 0 ? static_cast<Node *>(p_world) : node_of<Node>(nodes[KIND_BODY], id2);
+        if (!body1 || !body2) {
+            note("Contact exclusions involving left-out bodies were left out");
+            continue;
+        }
+        MujocoContactExclude *exclude = memnew(MujocoContactExclude);
+        exclude->set_name(node_name(el, "ContactExclude"));
+        // Under body1, which it points to by default (body1 = "..").
+        body1->add_child(exclude, true);
+        if (body1 == p_world) {
+            exclude->set_body1(NodePath(".."));
+        }
+        exclude->set_body2(exclude->get_path_to(body2));
+    }
+}
+
 void MujocoImporter::note_unsupported_model_parts()
 {
     const mjModel *m = model.get();
@@ -695,7 +750,6 @@ void MujocoImporter::note_unsupported_model_parts()
         { m->neq, "Equality constraints are not supported yet and were left out" },
         { m->nkey, "Keyframes are not supported yet and were left out" },
         { m->npair, "Explicit contact pairs are not supported yet and were left out" },
-        { m->nexclude, "Contact exclusions are not supported yet and were left out" },
         { m->ncam, "Cameras were left out" },
         { m->nlight, "Lights were left out" },
         { m->nflex, "Flexible bodies are not supported and were left out" },
@@ -799,6 +853,11 @@ PackedStringArray MujocoImporter::verify(MujocoWorld *p_world, int p_steps)
         compare("Joint", name, "damping", orig->dof_damping + a, ours->dof_damping + b, 1, tolerance);
         compare("Joint", name, "armature", orig->dof_armature + a, ours->dof_armature + b, 1, tolerance);
         compare("Joint", name, "friction loss", orig->dof_frictionloss + a, ours->dof_frictionloss + b, 1, tolerance);
+        const int qa = orig->jnt_qposadr[i], qb = ours->jnt_qposadr[j];
+        if (orig->jnt_type[i] == mjJNT_HINGE || orig->jnt_type[i] == mjJNT_SLIDE) {
+            compare("Joint", name, "ref", orig->qpos0 + qa, ours->qpos0 + qb, 1, tolerance);
+            compare("Joint", name, "springref", orig->qpos_spring + qa, ours->qpos_spring + qb, 1, tolerance);
+        }
     }
     for (int i = 0; i < orig->ngeom; i++) {
         const String name = name_of(mjOBJ_GEOM, i);
@@ -818,6 +877,7 @@ PackedStringArray MujocoImporter::verify(MujocoWorld *p_world, int p_steps)
         compare_int("Geom", name, "priority", orig->geom_priority[i], ours->geom_priority[j]);
         compare("Geom", name, "margin", orig->geom_margin + i, ours->geom_margin + j, 1, tolerance);
         compare("Geom", name, "gap", orig->geom_gap + i, ours->geom_gap + j, 1, tolerance);
+        compare("Geom", name, "solmix", orig->geom_solmix + i, ours->geom_solmix + j, 1, tolerance);
         compare("Geom", name, "solref", orig->geom_solref + mjNREF * i, ours->geom_solref + mjNREF * j, mjNREF, tolerance);
         compare("Geom", name, "solimp", orig->geom_solimp + mjNIMP * i, ours->geom_solimp + mjNIMP * j, mjNIMP, tolerance);
     }
@@ -862,6 +922,26 @@ PackedStringArray MujocoImporter::verify(MujocoWorld *p_world, int p_steps)
             continue;
         }
         compare_int("Sensor", name, "type", orig->sensor_type[i], ours->sensor_type[j]);
+    }
+
+    // Contact exclusions, as unordered body pairs.
+    {
+        std::vector<std::pair<int, int>> our_pairs;
+        for (int k = 0; k < ours->nexclude; k++) {
+            const int a = ours->exclude_signature[k] >> 16, b = ours->exclude_signature[k] & 0xFFFF;
+            our_pairs.emplace_back(std::min(a, b), std::max(a, b));
+        }
+        for (int k = 0; k < orig->nexclude; k++) {
+            const int a = orig->exclude_signature[k] >> 16, b = orig->exclude_signature[k] & 0xFFFF;
+            const int oa = a == 0 ? 0 : our_id(KIND_BODY, mjOBJ_BODY, a);
+            const int ob = b == 0 ? 0 : our_id(KIND_BODY, mjOBJ_BODY, b);
+            if (std::find(our_pairs.begin(), our_pairs.end(), std::make_pair(std::min(oa, ob), std::max(oa, ob))) == our_pairs.end()) {
+                add(vformat("Contact exclusion between '%s' and '%s' is missing", name_of(mjOBJ_BODY, a), name_of(mjOBJ_BODY, b)));
+            }
+        }
+        if (ours->nexclude != orig->nexclude) {
+            add(vformat("%d contact exclusions in the file, %d imported", static_cast<int>(orig->nexclude), static_cast<int>(ours->nexclude)));
+        }
     }
 
     // Both simulations from their initial state, without controls.

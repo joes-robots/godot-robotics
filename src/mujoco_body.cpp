@@ -13,6 +13,16 @@ mjsBody *MujocoBody::add_to_spec(mjSpec * /*p_spec*/, mjsBody *p_body, const Tra
     mjs_setName(body->element, p_name.utf8().get_data());
     mujoco_convert::to_mujoco(p_transform, body->pos, body->quat);
     body->mocap = mocap ? 1 : 0;
+    if (explicit_inertia) {
+        body->explicitinertial = 1;
+        body->mass = mass;
+        // The principal axes as a frame, in MuJoCo's convention (like a geom's frame).
+        mujoco_convert::to_mujoco(Transform3D(Basis(inertia_orientation), center_of_mass), body->ipos, body->iquat);
+        // Moments about Godot's x, y, z axes of that frame are MuJoCo's x, z, y.
+        body->inertia[0] = inertia.x;
+        body->inertia[1] = inertia.z;
+        body->inertia[2] = inertia.y;
+    }
     // Only for the MJCF: elements already name their resolved classes.
     if (!child_class.is_empty()) {
         mjs_setString(body->childclass, String(child_class).utf8().get_data());
@@ -36,6 +46,11 @@ StringName MujocoBody::get_child_class() const
 
 void MujocoBody::_validate_property(PropertyInfo &p_property) const
 {
+    const StringName name = p_property.name;
+    if (!explicit_inertia && (name == StringName("mass") || name == StringName("center_of_mass") ||
+                                     name == StringName("inertia") || name == StringName("inertia_orientation"))) {
+        p_property.usage = PROPERTY_USAGE_NO_EDITOR;
+    }
     if (p_property.name == StringName("child_class")) {
         if (const MujocoWorld *world = get_world()) {
             p_property.hint = PROPERTY_HINT_ENUM_SUGGESTION;
@@ -251,4 +266,65 @@ void MujocoBody::_bind_methods()
     ClassDB::bind_method(D_METHOD("get_child_class"), &MujocoBody::get_child_class);
     ADD_PROPERTY(PropertyInfo(Variant::BOOL, "mocap"), "set_mocap", "is_mocap");
     ADD_PROPERTY(PropertyInfo(Variant::STRING_NAME, "child_class"), "set_child_class", "get_child_class");
+
+    ClassDB::bind_method(D_METHOD("set_explicit_inertia", "explicit"), &MujocoBody::set_explicit_inertia);
+    ClassDB::bind_method(D_METHOD("has_explicit_inertia"), &MujocoBody::has_explicit_inertia);
+    ClassDB::bind_method(D_METHOD("set_mass", "mass"), &MujocoBody::set_mass);
+    ClassDB::bind_method(D_METHOD("get_mass"), &MujocoBody::get_mass);
+    ClassDB::bind_method(D_METHOD("set_center_of_mass", "center"), &MujocoBody::set_center_of_mass);
+    ClassDB::bind_method(D_METHOD("get_center_of_mass"), &MujocoBody::get_center_of_mass);
+    ClassDB::bind_method(D_METHOD("set_inertia", "inertia"), &MujocoBody::set_inertia);
+    ClassDB::bind_method(D_METHOD("get_inertia"), &MujocoBody::get_inertia);
+    ClassDB::bind_method(D_METHOD("set_inertia_orientation", "orientation"), &MujocoBody::set_inertia_orientation);
+    ClassDB::bind_method(D_METHOD("get_inertia_orientation"), &MujocoBody::get_inertia_orientation);
+    ADD_GROUP("Inertia", "");
+    ADD_PROPERTY(PropertyInfo(Variant::BOOL, "explicit_inertia"), "set_explicit_inertia", "has_explicit_inertia");
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "mass", PROPERTY_HINT_RANGE, "0.001,1000,0.001,or_greater,exp,suffix:kg"), "set_mass", "get_mass");
+    ADD_PROPERTY(PropertyInfo(Variant::VECTOR3, "center_of_mass", PROPERTY_HINT_NONE, "suffix:m"), "set_center_of_mass", "get_center_of_mass");
+    ADD_PROPERTY(PropertyInfo(Variant::VECTOR3, "inertia", PROPERTY_HINT_NONE, "suffix:kg m^2"), "set_inertia", "get_inertia");
+    ADD_PROPERTY(PropertyInfo(Variant::QUATERNION, "inertia_orientation"), "set_inertia_orientation", "get_inertia_orientation");
 }
+
+void MujocoBody::set_explicit_inertia(bool p_explicit)
+{
+    explicit_inertia = p_explicit;
+    notify_property_list_changed();
+    request_compile();
+}
+
+bool MujocoBody::has_explicit_inertia() const { return explicit_inertia; }
+
+void MujocoBody::set_mass(double p_mass)
+{
+    ERR_FAIL_COND_MSG(p_mass < 0.0, "Mass must not be negative.");
+    mass = p_mass;
+    request_compile();
+}
+
+double MujocoBody::get_mass() const { return mass; }
+
+void MujocoBody::set_center_of_mass(const Vector3 &p_center)
+{
+    center_of_mass = p_center;
+    request_compile();
+}
+
+Vector3 MujocoBody::get_center_of_mass() const { return center_of_mass; }
+
+void MujocoBody::set_inertia(const Vector3 &p_inertia)
+{
+    ERR_FAIL_COND_MSG(p_inertia.x < 0 || p_inertia.y < 0 || p_inertia.z < 0, "Inertia must not be negative.");
+    inertia = p_inertia;
+    request_compile();
+}
+
+Vector3 MujocoBody::get_inertia() const { return inertia; }
+
+void MujocoBody::set_inertia_orientation(const Quaternion &p_orientation)
+{
+    ERR_FAIL_COND_MSG(!p_orientation.is_normalized(), "The inertia orientation must be a unit quaternion.");
+    inertia_orientation = p_orientation;
+    request_compile();
+}
+
+Quaternion MujocoBody::get_inertia_orientation() const { return inertia_orientation; }

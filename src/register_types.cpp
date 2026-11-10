@@ -9,6 +9,7 @@
 
 #include "mujoco_actuator.h"
 #include "mujoco_body.h"
+#include "mujoco_contact_exclude.h"
 #include "mujoco_default.h"
 #include "mujoco_editor_plugin.h"
 #include "mujoco_element.h"
@@ -76,6 +77,7 @@ void initialize_gdextension_types(ModuleInitializationLevel p_level)
 	GDREGISTER_CLASS(MujocoActuator);
 	GDREGISTER_CLASS(MujocoSite);
 	GDREGISTER_CLASS(MujocoSensor);
+	GDREGISTER_CLASS(MujocoContactExclude);
 	GDREGISTER_CLASS(MujocoImporter);
 }
 

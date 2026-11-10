@@ -11,7 +11,9 @@
 // slide axis (MuJoCo's default joint axis, local z, converted to Godot). Free
 // joints ignore both and must belong to a body whose parent is the world.
 //
-// Joint positions are measured from the pose in the scene, which is position 0.
+// The pose in the scene is joint position `ref` (0 unless set; MJCF's ref), so
+// by default positions are measured from it. A joint's spring (stiffness) pulls
+// toward springref.
 // Positive hinge rotation follows the right-hand rule about the axis.
 class MujocoJoint : public MujocoElement {
     GDCLASS(MujocoJoint, MujocoElement);
@@ -45,6 +47,12 @@ public:
     double get_armature() const;
     void set_frictionloss(double p_frictionloss);
     double get_frictionloss() const;
+    // Hinge and slide joints: the position of the scene pose, and the spring's rest
+    // position (radians or meters).
+    void set_ref(double p_ref);
+    double get_ref() const;
+    void set_springref(double p_springref);
+    double get_springref() const;
 
     // Simulation state of a hinge (radians, rad/s) or slide (meters, m/s) joint.
     // Readable whenever the model has compiled; settable only while the game runs.
@@ -69,7 +77,8 @@ private:
 
     // Attributes (see mujoco_element.h): type, limited, range (hinge: radians,
     // slide: meters, ball: only y, the maximum angle), damping, stiffness,
-    // armature (extra rotor inertia, or mass for slide), frictionloss.
+    // armature (extra rotor inertia, or mass for slide), frictionloss, ref,
+    // springref.
 };
 
 VARIANT_ENUM_CAST(MujocoJoint::Type);

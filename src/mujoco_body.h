@@ -2,8 +2,12 @@
 
 #include "mujoco_element.h"
 
+#include <godot_cpp/variant/quaternion.hpp>
+
 // A MuJoCo body: a rigid frame that its child geoms and joints attach to.
-// Mass and inertia are computed by MuJoCo from the body's geoms.
+// Mass and inertia are computed by MuJoCo from the body's geoms, unless
+// explicit_inertia is on (MJCF's <inertial>): then mass, center_of_mass,
+// inertia and inertia_orientation give them and the geoms add no mass.
 // Without a joint the body is welded to its parent body.
 //
 // While the game runs, the world writes the simulated pose into this node
@@ -28,6 +32,19 @@ public:
     // unless they or a nearer body name one. Empty for none.
     void set_child_class(const godot::StringName &p_class);
     godot::StringName get_child_class() const;
+
+    // Explicit mass and inertia, in the body's local frame (Godot conventions).
+    void set_explicit_inertia(bool p_explicit);
+    bool has_explicit_inertia() const;
+    void set_mass(double p_mass);
+    double get_mass() const;
+    void set_center_of_mass(const godot::Vector3 &p_center);
+    godot::Vector3 get_center_of_mass() const;
+    // Principal moments of inertia about the axes of inertia_orientation (kg m^2).
+    void set_inertia(const godot::Vector3 &p_inertia);
+    godot::Vector3 get_inertia() const;
+    void set_inertia_orientation(const godot::Quaternion &p_orientation);
+    godot::Quaternion get_inertia_orientation() const;
 
     // Velocity of the body's origin, in global coordinates (zero for mocap bodies).
     godot::Vector3 get_linear_velocity();
@@ -61,6 +78,11 @@ private:
 
     bool mocap = false;
     godot::StringName child_class;
+    bool explicit_inertia = false;
+    double mass = 1.0;
+    godot::Vector3 center_of_mass;
+    godot::Vector3 inertia{ 0.01, 0.01, 0.01 };
+    godot::Quaternion inertia_orientation;
     bool has_rest_transform = false;
     godot::Transform3D rest_transform;
 };

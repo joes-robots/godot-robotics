@@ -13,13 +13,21 @@
 		</member>
 		<member name="color" type="Color" setter="set_color" getter="get_color" default="Color(0.5, 0.5, 0.5, 1)">
 		</member>
+		<member name="condim" type="int" setter="set_condim" getter="get_condim" default="3">
+		</member>
 		<member name="density" type="float" setter="set_density" getter="get_density" default="1000.0">
 		</member>
 		<member name="friction" type="Vector3" setter="set_friction" getter="get_friction" default="Vector3(1, 0.005, 0.0001)">
 		</member>
+		<member name="gap" type="float" setter="set_gap" getter="get_gap" default="0.0">
+		</member>
 		<member name="height" type="float" setter="set_height" getter="get_height">
 		</member>
+		<member name="margin" type="float" setter="set_margin" getter="get_margin" default="0.0">
+		</member>
 		<member name="mass" type="float" setter="set_mass" getter="get_mass" default="0.0">
+		</member>
+		<member name="priority" type="int" setter="set_priority" getter="get_priority" default="0">
 		</member>
 		<member name="radius" type="float" setter="set_radius" getter="get_radius">
 		</member>
@@ -28,6 +36,22 @@
 		<member name="show_shape" type="bool" setter="set_show_shape" getter="is_showing_shape" default="true">
 		</member>
 		<member name="size" type="Vector3" setter="set_size" getter="get_size" default="Vector3(1, 1, 1)">
+		</member>
+		<member name="solimp_dmax" type="float" setter="set_solimp_dmax" getter="get_solimp_dmax" default="0.95">
+		</member>
+		<member name="solimp_dmin" type="float" setter="set_solimp_dmin" getter="get_solimp_dmin" default="0.9">
+		</member>
+		<member name="solimp_midpoint" type="float" setter="set_solimp_midpoint" getter="get_solimp_midpoint" default="0.5">
+		</member>
+		<member name="solimp_power" type="float" setter="set_solimp_power" getter="get_solimp_power" default="2.0">
+		</member>
+		<member name="solimp_width" type="float" setter="set_solimp_width" getter="get_solimp_width" default="0.001">
+		</member>
+		<member name="solmix" type="float" setter="set_solmix" getter="get_solmix" default="1.0">
+		</member>
+		<member name="solref_dampratio" type="float" setter="set_solref_dampratio" getter="get_solref_dampratio" default="1.0">
+		</member>
+		<member name="solref_timeconst" type="float" setter="set_solref_timeconst" getter="get_solref_timeconst" default="0.02">
 		</member>
 	</members>
 	<constants>

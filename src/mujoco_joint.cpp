@@ -17,6 +17,8 @@ const MujocoAttribute JOINT_ATTRIBUTES[] = {
     { "stiffness", Variant::FLOAT, { 0 } },    // spring force (or torque) per unit displacement
     { "armature", Variant::FLOAT, { 0 } },     // extra rotor inertia (or mass for slide)
     { "frictionloss", Variant::FLOAT, { 0 } }, // dry friction force (or torque)
+    { "ref", Variant::FLOAT, { 0 } },          // joint position of the scene pose
+    { "springref", Variant::FLOAT, { 0 } },    // spring rest position
 };
 const MujocoAttributeTable JOINT_TABLE = MUJOCO_ATTRIBUTE_TABLE(JOINT_ATTRIBUTES);
 
@@ -67,6 +69,8 @@ void MujocoJoint::write_attributes(mjsJoint *p_joint) const
     p_joint->stiffness[0] = get_stiffness();
     p_joint->armature = get_armature();
     p_joint->frictionloss = get_frictionloss();
+    p_joint->ref = get_ref();
+    p_joint->springref = get_springref();
 }
 
 void MujocoJoint::write_class_defaults(mjsDefault *p_default)
@@ -169,7 +173,13 @@ void MujocoJoint::_validate_property(PropertyInfo &p_property) const
     const bool has_axis = type != TYPE_FREE;
     const StringName name = p_property.name;
 
-    if ((name == StringName("limited") || name == StringName("stiffness")) && !has_axis) {
+    const bool single_value = type == TYPE_HINGE || type == TYPE_SLIDE;
+    if ((name == StringName("ref") || name == StringName("springref"))) {
+        if (!single_value) {
+            p_property.usage = PROPERTY_USAGE_NONE; // hidden; the value is stored in overrides
+        }
+        p_property.hint_string = type == TYPE_SLIDE ? "-10,10,0.001,or_less,or_greater,suffix:m" : "-360,360,0.1,or_less,or_greater,radians_as_degrees";
+    } else if ((name == StringName("limited") || name == StringName("stiffness")) && !has_axis) {
         p_property.usage = PROPERTY_USAGE_NONE; // hidden; the value is stored in overrides
     } else if (name == StringName("range")) {
         if (!has_axis || !is_limited()) {
@@ -201,6 +211,10 @@ void MujocoJoint::_bind_methods()
     ClassDB::bind_method(D_METHOD("get_armature"), &MujocoJoint::get_armature);
     ClassDB::bind_method(D_METHOD("set_frictionloss", "frictionloss"), &MujocoJoint::set_frictionloss);
     ClassDB::bind_method(D_METHOD("get_frictionloss"), &MujocoJoint::get_frictionloss);
+    ClassDB::bind_method(D_METHOD("set_ref", "ref"), &MujocoJoint::set_ref);
+    ClassDB::bind_method(D_METHOD("get_ref"), &MujocoJoint::get_ref);
+    ClassDB::bind_method(D_METHOD("set_springref", "springref"), &MujocoJoint::set_springref);
+    ClassDB::bind_method(D_METHOD("get_springref"), &MujocoJoint::get_springref);
     ClassDB::bind_method(D_METHOD("get_joint_position"), &MujocoJoint::get_joint_position);
     ClassDB::bind_method(D_METHOD("set_joint_position", "position"), &MujocoJoint::set_joint_position);
     ClassDB::bind_method(D_METHOD("get_joint_velocity"), &MujocoJoint::get_joint_velocity);
@@ -214,6 +228,8 @@ void MujocoJoint::_bind_methods()
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "stiffness", PROPERTY_HINT_RANGE, "0,1000,0.001,or_greater", PROPERTY_USAGE_EDITOR), "set_stiffness", "get_stiffness");
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "armature", PROPERTY_HINT_RANGE, "0,10,0.0001,or_greater", PROPERTY_USAGE_EDITOR), "set_armature", "get_armature");
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "frictionloss", PROPERTY_HINT_RANGE, "0,100,0.001,or_greater", PROPERTY_USAGE_EDITOR), "set_frictionloss", "get_frictionloss");
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "ref", PROPERTY_HINT_RANGE, "-360,360,0.1,or_less,or_greater,radians_as_degrees", PROPERTY_USAGE_EDITOR), "set_ref", "get_ref");
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "springref", PROPERTY_HINT_RANGE, "-360,360,0.1,or_less,or_greater,radians_as_degrees", PROPERTY_USAGE_EDITOR), "set_springref", "get_springref");
 }
 
 void MujocoJoint::set_type(Type p_type)
@@ -278,3 +294,19 @@ void MujocoJoint::set_frictionloss(double p_frictionloss)
 }
 
 double MujocoJoint::get_frictionloss() const { return get_attribute("frictionloss"); }
+
+void MujocoJoint::set_ref(double p_ref)
+{
+    set_attribute("ref", p_ref);
+    changed();
+}
+
+double MujocoJoint::get_ref() const { return get_attribute("ref"); }
+
+void MujocoJoint::set_springref(double p_springref)
+{
+    set_attribute("springref", p_springref);
+    changed();
+}
+
+double MujocoJoint::get_springref() const { return get_attribute("springref"); }

@@ -72,6 +72,7 @@ private:
     void import_body_children(mjsBody *p_body, godot::Node *p_node, MujocoWorld *p_world, const godot::String &p_class);
     void import_actuators(MujocoWorld *p_world);
     void import_sensors(MujocoWorld *p_world);
+    void import_excludes(MujocoWorld *p_world);
     void note_unsupported_model_parts();
 
     // Adds p_element under p_parent, sets its class if it differs from p_class,

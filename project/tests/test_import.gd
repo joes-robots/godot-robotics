@@ -99,9 +99,8 @@ func run() -> void:
 	var report := importer.get_report()
 	print("report: %s" % [report])
 	check("reports mesh geoms", report_has(report, "Mesh geoms"))
-	check("reports explicit inertia", report_has(report, "<inertial>"))
-	check("reports contact parameters", report_has(report, "condim"))
-	check("reports joint ref", report_has(report, "ref"))
+	# Imported since Phase 3.3 (see test_contact): explicit inertia, condim, joint ref.
+	check("no longer reports inertia, contact parameters or ref", not report_has(report, "inertia") and not report_has(report, "condim") and not report_has(report, "ref"))
 	check("reports tendons", report_has(report, "Tendons"))
 	check("reports equality constraints", report_has(report, "Equality"))
 	check("reports the tendon actuator", report_has(report, "Actuators other than"))
@@ -110,7 +109,8 @@ func run() -> void:
 	await process_frame
 	diffs = importer.verify(extras, 100)
 	print("verify: %s" % [diffs])
-	check("verify finds the differences (mass, condim)", report_has(diffs, "mass") and report_has(diffs, "condim"))
+	check("verify finds what was left out (the mesh geom, the muscle)", report_has(diffs, "Geom '#0' was not imported") and report_has(diffs, "Actuator 'm' was not imported"))
+	check("but not the inertia or contact parameters", not report_has(diffs, "mass") and not report_has(diffs, "condim"))
 	extras.queue_free()
 
 	# A missing file fails cleanly.

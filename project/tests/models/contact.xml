@@ -1,0 +1,31 @@
+<!-- Explicit inertia (with fullinertia), geom contact parameters in classes,
+     joint ref and springref (degrees for hinges), and contact exclusions. -->
+<mujoco model="contact_test">
+  <default>
+    <geom condim="4" solref="0.01 0.8" solimp="0.8 0.9 0.002 0.4 3" margin="0.001"/>
+    <joint springref="5"/>
+    <default class="grippy">
+      <geom condim="6" priority="2" friction="1.5 0.01 0.001" solmix="2"/>
+    </default>
+  </default>
+  <worldbody>
+    <geom name="floor" type="plane" size="3 3 0.1"/>
+    <body name="base" pos="0 0 0.5">
+      <freejoint name="base_free"/>
+      <inertial pos="0.1 0 0" mass="4" fullinertia="0.2 0.3 0.4 0.01 0 0"/>
+      <geom name="visual" type="box" size="0.2 0.2 0.1" contype="0" conaffinity="0"/>
+      <body name="arm" pos="0 0 0.2">
+        <joint name="hinge" axis="0 1 0" ref="30" stiffness="5" damping="1" range="-60 60"/>
+        <geom name="arm_geom" class="grippy" type="capsule" fromto="0 0 0 0.3 0 0" size="0.03" gap="0.01"/>
+        <body name="tip" pos="0.3 0 0">
+          <joint name="slide" type="slide" axis="1 0 0" ref="0.05" springref="0.1" stiffness="100"/>
+          <geom name="tip_geom" type="sphere" size="0.04"/>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+  <contact>
+    <exclude name="no_tip_base" body1="base" body2="tip"/>
+    <exclude body1="world" body2="arm"/>
+  </contact>
+</mujoco>
