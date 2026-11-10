@@ -76,3 +76,25 @@ func run() -> void:
 	add(root, MujocoGeom.new(), "Stray")
 	await process_frame
 	check("geom outside a world", true)
+
+	# A plane's grid spacing (MuJoCo's third size parameter) must be positive. An
+	# imported model's main class has MuJoCo's size 0, which a new plane inherits.
+	var pw := make_world("PlaneWorld")
+	var main := MujocoDefault.new()
+	main.name = "main"
+	pw.add_child(main)
+	main.overrides = {"geom": {"size2": 0.0}}
+	await process_frame
+	var floor_body: MujocoBody = add(pw, MujocoBody.new(), "FloorBody")
+	var plane: MujocoGeom = add(floor_body, MujocoGeom.new(), "Plane")
+	plane.shape = MujocoGeom.SHAPE_PLANE
+	plane.size = Vector3(10, 0, 10)
+	print("(the next compile error is expected)")
+	await process_frame
+	check("an inherited grid spacing of 0 doesn't compile", not mjcf_elements(pw.get_mjcf()).has("FloorBody/Plane"))
+	check_near("the plane inherits it", plane.grid_spacing, 0.0, 1e-12)
+	plane.grid_spacing = 0.5
+	await process_frame
+	var plane_attributes: Dictionary = mjcf_elements(pw.get_mjcf()).get("FloorBody/Plane", {})
+	check_numbers("with grid_spacing set it compiles", plane_attributes.get("size", ""), "5 5 0.5")
+	pw.queue_free()

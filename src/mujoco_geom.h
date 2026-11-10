@@ -15,7 +15,8 @@
 // it the way MuJoCo does. The radius, height and size properties show it in Godot
 // conventions (full extents, total heights). Capsule, cylinder and plane use the
 // node's local Y axis, like Godot's CapsuleMesh, CylinderMesh and PlaneMesh.
-// A plane whose size is 0 is infinite, as in MuJoCo (it is drawn 100 m wide).
+// A plane whose size is 0 is infinite, as in MuJoCo (it is drawn 100 m wide). Its
+// third size parameter is the grid_spacing, which MuJoCo requires to be positive.
 //
 // A capsule's height includes its caps but is stored as the length between them,
 // so a capsule that inherits its height gets longer when its radius grows (as in
@@ -55,6 +56,9 @@ public:
     double get_height() const;
     void set_size(const godot::Vector3 &p_size);
     godot::Vector3 get_size() const;
+    // Planes only: MuJoCo's third size parameter (the spacing of its grid lines).
+    void set_grid_spacing(double p_spacing);
+    double get_grid_spacing() const;
     void set_mesh(const godot::Ref<godot::Mesh> &p_mesh);
     godot::Ref<godot::Mesh> get_mesh() const;
     void set_density(double p_density);

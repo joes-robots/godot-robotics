@@ -65,6 +65,8 @@ PackedStringArray MujocoGeom::get_property_attributes(const StringName &p_proper
         keys.push_back("size0");
     } else if (p_property == StringName("height")) {
         keys.push_back("size1");
+    } else if (p_property == StringName("grid_spacing")) {
+        keys.push_back("size2");
     } else if (p_property == StringName("size")) {
         keys.push_back("size0");
         keys.push_back("size1");
@@ -263,6 +265,10 @@ void MujocoGeom::inherited_changed()
 PackedStringArray MujocoGeom::_get_configuration_warnings() const
 {
     PackedStringArray warnings = MujocoElement::_get_configuration_warnings();
+    if (!is_class_section() && get_shape() == SHAPE_PLANE && get_grid_spacing() <= 0.0) {
+        // E.g. inherited from an imported model's main class (MuJoCo's default size is 0).
+        warnings.push_back("MuJoCo needs a plane's grid_spacing to be positive; this one is inherited as 0. Set grid_spacing.");
+    }
     if (!is_class_section() && get_shape() == SHAPE_MESH) {
         std::vector<float> vertices;
         std::vector<int> faces;
@@ -419,7 +425,8 @@ void MujocoGeom::_validate_property(PropertyInfo &p_property) const
 
     if ((p_property.name == StringName("radius") && !uses_radius) ||
             (p_property.name == StringName("height") && !uses_height) ||
-            (p_property.name == StringName("size") && !uses_size)) {
+            (p_property.name == StringName("size") && !uses_size) ||
+            (p_property.name == StringName("grid_spacing") && shape != SHAPE_PLANE)) {
         p_property.usage = PROPERTY_USAGE_NONE; // hidden; the value is stored in overrides
     }
     if (p_property.name == StringName("mesh") && shape != SHAPE_MESH) {
@@ -445,6 +452,8 @@ void MujocoGeom::_bind_methods()
     ClassDB::bind_method(D_METHOD("get_height"), &MujocoGeom::get_height);
     ClassDB::bind_method(D_METHOD("set_size", "size"), &MujocoGeom::set_size);
     ClassDB::bind_method(D_METHOD("get_size"), &MujocoGeom::get_size);
+    ClassDB::bind_method(D_METHOD("set_grid_spacing", "spacing"), &MujocoGeom::set_grid_spacing);
+    ClassDB::bind_method(D_METHOD("get_grid_spacing"), &MujocoGeom::get_grid_spacing);
     ClassDB::bind_method(D_METHOD("set_mesh", "mesh"), &MujocoGeom::set_mesh);
     ClassDB::bind_method(D_METHOD("get_mesh"), &MujocoGeom::get_mesh);
     ClassDB::bind_method(D_METHOD("set_density", "density"), &MujocoGeom::set_density);
@@ -491,6 +500,7 @@ void MujocoGeom::_bind_methods()
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "radius", PROPERTY_HINT_RANGE, "0.001,10,0.001,or_greater,suffix:m", PROPERTY_USAGE_EDITOR), "set_radius", "get_radius");
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "height", PROPERTY_HINT_RANGE, "0.001,10,0.001,or_greater,suffix:m", PROPERTY_USAGE_EDITOR), "set_height", "get_height");
     ADD_PROPERTY(PropertyInfo(Variant::VECTOR3, "size", PROPERTY_HINT_NONE, "suffix:m", PROPERTY_USAGE_EDITOR), "set_size", "get_size");
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "grid_spacing", PROPERTY_HINT_RANGE, "0.001,10,0.001,or_greater,suffix:m", PROPERTY_USAGE_EDITOR), "set_grid_spacing", "get_grid_spacing");
     ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "mesh", PROPERTY_HINT_RESOURCE_TYPE, "Mesh"), "set_mesh", "get_mesh");
 
     ADD_GROUP("Mass", "");
@@ -600,6 +610,15 @@ void MujocoGeom::set_mesh(const Ref<Mesh> &p_mesh)
 }
 
 Ref<Mesh> MujocoGeom::get_mesh() const { return mesh; }
+
+void MujocoGeom::set_grid_spacing(double p_spacing)
+{
+    ERR_FAIL_COND_MSG(p_spacing <= 0.0, "Grid spacing must be positive.");
+    set_attribute("size2", p_spacing);
+    changed();
+}
+
+double MujocoGeom::get_grid_spacing() const { return get_attribute("size2"); }
 
 void MujocoGeom::set_density(double p_density)
 {

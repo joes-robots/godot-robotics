@@ -21,6 +21,8 @@
 		</member>
 		<member name="gap" type="float" setter="set_gap" getter="get_gap" default="0.0">
 		</member>
+		<member name="grid_spacing" type="float" setter="set_grid_spacing" getter="get_grid_spacing">
+		</member>
 		<member name="height" type="float" setter="set_height" getter="get_height">
 		</member>
 		<member name="margin" type="float" setter="set_margin" getter="get_margin" default="0.0">
