@@ -126,6 +126,7 @@ void MujocoWorld::_notification(int p_what)
             initialized = true;
             compile_queued = false;
             compile();
+            // enable physics only during game mode, not in editor
             set_physics_process(!Engine::get_singleton()->is_editor_hint());
             break;
         case NOTIFICATION_PHYSICS_PROCESS:
@@ -254,7 +255,7 @@ void MujocoWorld::add_subtree(Node *p_node, mjSpec *p_spec, mjsBody *p_body, con
 
 void MujocoWorld::step_simulation(double p_delta)
 {
-    flush_compile();
+    run_queued_compile();
     if (!running || !model || !data) {
         return;
     }
@@ -333,7 +334,7 @@ void MujocoWorld::step_once()
 
 void MujocoWorld::reset()
 {
-    flush_compile();
+    run_queued_compile();
     ERR_FAIL_COND_MSG(!model || !data, "Nothing to reset: the model has not compiled.");
     mj_resetData(model.get(), data.get());
     write_controls(model.get(), data.get());
@@ -347,7 +348,7 @@ void MujocoWorld::step(int p_count)
 {
     ERR_FAIL_COND_MSG(Engine::get_singleton()->is_editor_hint(), "step() only works while the game runs.");
     ERR_FAIL_COND_MSG(p_count < 1, "step() needs a count of at least 1.");
-    flush_compile();
+    run_queued_compile();
     ERR_FAIL_COND_MSG(!model || !data, "Nothing to step: the model has not compiled.");
     for (int i = 0; i < p_count; i++) {
         step_once();
@@ -357,13 +358,13 @@ void MujocoWorld::step(int p_count)
 
 mjModel *MujocoWorld::get_model()
 {
-    flush_compile();
+    run_queued_compile();
     return model.get();
 }
 
 mjData *MujocoWorld::get_data()
 {
-    flush_compile();
+    run_queued_compile();
     return data.get();
 }
 
@@ -463,7 +464,7 @@ double MujocoWorld::get_simulation_time() const
 
 String MujocoWorld::get_mjcf()
 {
-    flush_compile();
+    run_queued_compile();
     if (!spec) {
         return String();
     }
@@ -487,10 +488,10 @@ void MujocoWorld::request_compile()
         return;
     }
     compile_queued = true;
-    callable_mp(this, &MujocoWorld::flush_compile).call_deferred();
+    callable_mp(this, &MujocoWorld::run_queued_compile).call_deferred();
 }
 
-void MujocoWorld::flush_compile()
+void MujocoWorld::run_queued_compile()
 {
     if (!compile_queued) {
         return;

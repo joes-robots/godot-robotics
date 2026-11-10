@@ -39,7 +39,7 @@ public:
     // Queues one deferred compile; repeated requests in the same frame are merged.
     void request_compile();
     // Runs the queued compile now, if any. Call before reading model/data.
-    void flush_compile();
+    void run_queued_compile();
 
     // The current model as MJCF (MuJoCo XML), or an empty string if nothing has compiled.
     godot::String get_mjcf();

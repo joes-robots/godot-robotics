@@ -50,63 +50,63 @@ constexpr const char *TOLERANCE = "0,0.01,0.0000000001,or_greater";
 constexpr const char *ITERATIONS = "0,1000,1,or_greater";
 constexpr const char *FRICTION = "0,2,0.0001,or_greater";
 
-#define OFF(field) offsetof(mjOption, field)
-#define OFF_AT(field, i) (offsetof(mjOption, field) + (i) * sizeof(mjtNum))
+#define BYTE_OFFSET(field) offsetof(mjOption, field)
+#define BYTE_OFFSET_AT(field, i) (offsetof(mjOption, field) + (i) * sizeof(mjtNum))
 
 // Order here is the order shown in the inspector. Properties before the first
 // SUBGROUP appear directly under "Options".
 const Field FIELDS[] = {
-    { "timestep", Kind::REAL, OFF(timestep), "0.00001,0.1,0.00001,or_greater,exp,suffix:s" },
-    { "integrator", Kind::ENUM, OFF(integrator), "Euler:0,RK4:1,Implicit:2,Implicit Fast:3", 4 },
-    { "gravity", Kind::VEC3, OFF(gravity), "suffix:m/s^2" },
-    { "wind", Kind::VEC3, OFF(wind), "suffix:m/s" },
-    { "magnetic", Kind::VEC3, OFF(magnetic), "" },
-    { "density", Kind::REAL, OFF(density), "0,10000,0.001,or_greater,suffix:kg/m^3" },
-    { "viscosity", Kind::REAL, OFF(viscosity), "0,10,0.00001,or_greater" },
+    { "timestep", Kind::REAL, BYTE_OFFSET(timestep), "0.00001,0.1,0.00001,or_greater,exp,suffix:s" },
+    { "integrator", Kind::ENUM, BYTE_OFFSET(integrator), "Euler:0,RK4:1,Implicit:2,Implicit Fast:3", 4 },
+    { "gravity", Kind::VEC3, BYTE_OFFSET(gravity), "suffix:m/s^2" },
+    { "wind", Kind::VEC3, BYTE_OFFSET(wind), "suffix:m/s" },
+    { "magnetic", Kind::VEC3, BYTE_OFFSET(magnetic), "" },
+    { "density", Kind::REAL, BYTE_OFFSET(density), "0,10000,0.001,or_greater,suffix:kg/m^3" },
+    { "viscosity", Kind::REAL, BYTE_OFFSET(viscosity), "0,10,0.00001,or_greater" },
 
     { "Flags", Kind::SUBGROUP, 0, "option_" },
-    { "disableflags", Kind::FLAGS, OFF(disableflags), nullptr, DISABLE_MASK },
-    { "enableflags", Kind::FLAGS, OFF(enableflags), nullptr, ENABLE_MASK },
-    { "actuatorgroupdisable", Kind::FLAGS, OFF(disableactuator), nullptr, ACTUATOR_MASK },
+    { "disableflags", Kind::FLAGS, BYTE_OFFSET(disableflags), nullptr, DISABLE_MASK },
+    { "enableflags", Kind::FLAGS, BYTE_OFFSET(enableflags), nullptr, ENABLE_MASK },
+    { "actuatorgroupdisable", Kind::FLAGS, BYTE_OFFSET(disableactuator), nullptr, ACTUATOR_MASK },
 
     { "Solver", Kind::SUBGROUP, 0, "option_" },
-    { "solver", Kind::ENUM, OFF(solver), "PGS:0,CG:1,Newton:2", 3 },
-    { "cone", Kind::ENUM, OFF(cone), "Pyramidal:0,Elliptic:1", 2 },
-    { "jacobian", Kind::ENUM, OFF(jacobian), "Dense:0,Sparse:1,Auto:2", 3 },
-    { "impratio", Kind::REAL, OFF(impratio), "0.0001,100,0.0001,or_greater,exp" },
-    { "iterations", Kind::INT, OFF(iterations), ITERATIONS },
-    { "tolerance", Kind::REAL, OFF(tolerance), TOLERANCE },
-    { "ls_iterations", Kind::INT, OFF(ls_iterations), ITERATIONS },
-    { "ls_tolerance", Kind::REAL, OFF(ls_tolerance), TOLERANCE },
-    { "noslip_iterations", Kind::INT, OFF(noslip_iterations), ITERATIONS },
-    { "noslip_tolerance", Kind::REAL, OFF(noslip_tolerance), TOLERANCE },
-    { "sleep_tolerance", Kind::REAL, OFF(sleep_tolerance), TOLERANCE },
+    { "solver", Kind::ENUM, BYTE_OFFSET(solver), "PGS:0,CG:1,Newton:2", 3 },
+    { "cone", Kind::ENUM, BYTE_OFFSET(cone), "Pyramidal:0,Elliptic:1", 2 },
+    { "jacobian", Kind::ENUM, BYTE_OFFSET(jacobian), "Dense:0,Sparse:1,Auto:2", 3 },
+    { "impratio", Kind::REAL, BYTE_OFFSET(impratio), "0.0001,100,0.0001,or_greater,exp" },
+    { "iterations", Kind::INT, BYTE_OFFSET(iterations), ITERATIONS },
+    { "tolerance", Kind::REAL, BYTE_OFFSET(tolerance), TOLERANCE },
+    { "ls_iterations", Kind::INT, BYTE_OFFSET(ls_iterations), ITERATIONS },
+    { "ls_tolerance", Kind::REAL, BYTE_OFFSET(ls_tolerance), TOLERANCE },
+    { "noslip_iterations", Kind::INT, BYTE_OFFSET(noslip_iterations), ITERATIONS },
+    { "noslip_tolerance", Kind::REAL, BYTE_OFFSET(noslip_tolerance), TOLERANCE },
+    { "sleep_tolerance", Kind::REAL, BYTE_OFFSET(sleep_tolerance), TOLERANCE },
 
     { "Collision", Kind::SUBGROUP, 0, "option_" },
-    { "ccd_iterations", Kind::INT, OFF(ccd_iterations), ITERATIONS },
-    { "ccd_tolerance", Kind::REAL, OFF(ccd_tolerance), TOLERANCE },
-    { "sdf_iterations", Kind::INT, OFF(sdf_iterations), "1,100,1,or_greater" },
-    { "sdf_initpoints", Kind::INT, OFF(sdf_initpoints), "1,100,1,or_greater" },
+    { "ccd_iterations", Kind::INT, BYTE_OFFSET(ccd_iterations), ITERATIONS },
+    { "ccd_tolerance", Kind::REAL, BYTE_OFFSET(ccd_tolerance), TOLERANCE },
+    { "sdf_iterations", Kind::INT, BYTE_OFFSET(sdf_iterations), "1,100,1,or_greater" },
+    { "sdf_initpoints", Kind::INT, BYTE_OFFSET(sdf_initpoints), "1,100,1,or_greater" },
 
     // Only used when the Override enable flag is set.
     { "Contact Override", Kind::SUBGROUP, 0, "option_o_" },
-    { "o_margin", Kind::REAL, OFF(o_margin), "0,1,0.0001,or_greater,suffix:m" },
-    { "o_solref_timeconst", Kind::REAL, OFF_AT(o_solref, 0), "0.0001,1,0.0001,or_greater,or_less,suffix:s" },
-    { "o_solref_dampratio", Kind::REAL, OFF_AT(o_solref, 1), "0,2,0.001,or_greater,or_less" },
-    { "o_solimp_dmin", Kind::REAL, OFF_AT(o_solimp, 0), "0.0001,0.9999,0.0001" },
-    { "o_solimp_dmax", Kind::REAL, OFF_AT(o_solimp, 1), "0.0001,0.9999,0.0001" },
-    { "o_solimp_width", Kind::REAL, OFF_AT(o_solimp, 2), "0,1,0.0001,or_greater,suffix:m" },
-    { "o_solimp_midpoint", Kind::REAL, OFF_AT(o_solimp, 3), "0,1,0.001" },
-    { "o_solimp_power", Kind::REAL, OFF_AT(o_solimp, 4), "1,10,0.01,or_greater" },
-    { "o_friction_slide1", Kind::REAL, OFF_AT(o_friction, 0), FRICTION },
-    { "o_friction_slide2", Kind::REAL, OFF_AT(o_friction, 1), FRICTION },
-    { "o_friction_spin", Kind::REAL, OFF_AT(o_friction, 2), FRICTION },
-    { "o_friction_roll1", Kind::REAL, OFF_AT(o_friction, 3), FRICTION },
-    { "o_friction_roll2", Kind::REAL, OFF_AT(o_friction, 4), FRICTION },
+    { "o_margin", Kind::REAL, BYTE_OFFSET(o_margin), "0,1,0.0001,or_greater,suffix:m" },
+    { "o_solref_timeconst", Kind::REAL, BYTE_OFFSET_AT(o_solref, 0), "0.0001,1,0.0001,or_greater,or_less,suffix:s" },
+    { "o_solref_dampratio", Kind::REAL, BYTE_OFFSET_AT(o_solref, 1), "0,2,0.001,or_greater,or_less" },
+    { "o_solimp_dmin", Kind::REAL, BYTE_OFFSET_AT(o_solimp, 0), "0.0001,0.9999,0.0001" },
+    { "o_solimp_dmax", Kind::REAL, BYTE_OFFSET_AT(o_solimp, 1), "0.0001,0.9999,0.0001" },
+    { "o_solimp_width", Kind::REAL, BYTE_OFFSET_AT(o_solimp, 2), "0,1,0.0001,or_greater,suffix:m" },
+    { "o_solimp_midpoint", Kind::REAL, BYTE_OFFSET_AT(o_solimp, 3), "0,1,0.001" },
+    { "o_solimp_power", Kind::REAL, BYTE_OFFSET_AT(o_solimp, 4), "1,10,0.01,or_greater" },
+    { "o_friction_slide1", Kind::REAL, BYTE_OFFSET_AT(o_friction, 0), FRICTION },
+    { "o_friction_slide2", Kind::REAL, BYTE_OFFSET_AT(o_friction, 1), FRICTION },
+    { "o_friction_spin", Kind::REAL, BYTE_OFFSET_AT(o_friction, 2), FRICTION },
+    { "o_friction_roll1", Kind::REAL, BYTE_OFFSET_AT(o_friction, 3), FRICTION },
+    { "o_friction_roll2", Kind::REAL, BYTE_OFFSET_AT(o_friction, 4), FRICTION },
 };
 
-#undef OFF
-#undef OFF_AT
+#undef BYTE_OFFSET 
+#undef BYTE_OFFSET_AT 
 
 template <typename T>
 T &field_ref(mjOption &p_option, size_t p_offset) {
