@@ -173,6 +173,15 @@ func run() -> void:
 	check_near("a tendon inherits its class's width", classed.width, 0.02, 1e-12)
 	check("without overriding it", classed.overrides.is_empty())
 	check_near("a joint inherits its class's limit margin", d.limit_margin, 0.01, 1e-12)
+	# MJCF doesn't allow a tendon's actuator force limits in a class, so the export
+	# must leave them out of <default> to load back into MuJoCo.
+	classed.actuator_force_limited = true
+	await process_frame
+	var reloaded := MujocoImporter.new().import_string(cw.get_mjcf())
+	check("the exported MJCF loads back into MuJoCo", reloaded != null)
+	if reloaded:
+		check("with the tendon's own force limit", (reloaded.get_node("Classed") as MujocoTendon).is_actuator_force_limited())
+		reloaded.free()
 
 	# A tendon whose path is wrong is left out, and the rest still compiles.
 	var mixed: MujocoTendon = add(cw, MujocoTendon.new(), "Mixed")
@@ -205,5 +214,7 @@ func run() -> void:
 	check("a pulley", world.get_node("split/Pulley") is MujocoTendonWrap and is_equal_approx(world.get_node("split/Pulley").divisor, 2.0))
 	check("tendon sensors under their tendon", (world.get_node("couple/couple_len") as MujocoSensor).type == MujocoSensor.TYPE_TENDON_POSITION)
 	var elbow: MujocoJoint = world.get_node("arm/forearm/elbow")
+	check("actuator force limits on joints and tendons", elbow.is_actuator_force_limited() and elbow.actuator_force_range.is_equal_approx(Vector2(-3, 3))
+			and cable.is_actuator_force_limited() and cable.actuator_force_range.is_equal_approx(Vector2(-1, 1)))
 	check("joint limit settings from the class", elbow.default_class == &"" and is_equal_approx(elbow.limit_margin, 0.01) and not elbow.overrides.has("limit_margin"))
 	world.free()

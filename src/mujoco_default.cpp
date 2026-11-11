@@ -1,4 +1,5 @@
 #include "mujoco_default.h"
+#include "mujoco_equality.h"
 #include "mujoco_actuator.h"
 #include "mujoco_geom.h"
 #include "mujoco_joint.h"
@@ -17,7 +18,8 @@ MujocoDefault::MujocoDefault()
     sections[1] = memnew(MujocoGeom);
     sections[2] = memnew(MujocoSite);
     sections[3] = memnew(MujocoTendon);
-    sections[4] = memnew(MujocoActuator);
+    sections[4] = memnew(MujocoEquality);
+    sections[5] = memnew(MujocoActuator);
     for (MujocoElement *element : sections) {
         element->class_owner = this;
         // A section's visible properties depend on its values (e.g. the geom shape).

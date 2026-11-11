@@ -89,6 +89,7 @@ private:
         KIND_ACTUATOR,
         KIND_SENSOR,
         KIND_TENDON,
+        KIND_EQUALITY,
         KIND_COUNT,
     };
 
@@ -100,6 +101,7 @@ private:
     // p_class is the class in effect there (from the enclosing childclasses).
     void import_body_children(mjsBody *p_body, godot::Node *p_node, MujocoWorld *p_world, const godot::String &p_class);
     void import_tendons(MujocoWorld *p_world);
+    void import_equalities(MujocoWorld *p_world);
     void import_actuators(MujocoWorld *p_world);
     void import_sensors(MujocoWorld *p_world);
     void import_excludes(MujocoWorld *p_world);

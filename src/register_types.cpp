@@ -13,6 +13,7 @@
 #include "mujoco_default.h"
 #include "mujoco_editor_plugin.h"
 #include "mujoco_element.h"
+#include "mujoco_equality.h"
 #include "mujoco_geom.h"
 #include "mujoco_import_plugin.h"
 #include "mujoco_importer.h"
@@ -86,6 +87,7 @@ void initialize_gdextension_types(ModuleInitializationLevel p_level)
 	GDREGISTER_CLASS(MujocoContactExclude);
 	GDREGISTER_CLASS(MujocoTendon);
 	GDREGISTER_CLASS(MujocoTendonWrap);
+	GDREGISTER_CLASS(MujocoEquality);
 	GDREGISTER_CLASS(MujocoImporter);
 }
 

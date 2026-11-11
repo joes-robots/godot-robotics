@@ -51,6 +51,12 @@ public:
     double get_armature() const;
     void set_spring_length(double p_value);
     double get_spring_length() const;
+    // A cap on the total force of the actuators driving this (MJCF's
+    // actuatorfrclimited and actuatorfrcrange).
+    void set_actuator_force_limited(bool p_limited);
+    bool is_actuator_force_limited() const;
+    void set_actuator_force_range(const godot::Vector2 &p_range);
+    godot::Vector2 get_actuator_force_range() const;
     void set_limit_margin(double p_value);
     double get_limit_margin() const;
     void set_limit_solref_timeconst(double p_value);

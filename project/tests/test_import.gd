@@ -119,7 +119,7 @@ func run() -> void:
 	# Imported since Phase 3.3 (see test_contact): explicit inertia, condim, joint ref.
 	check("no longer reports inertia, contact parameters or ref", not report_has(report, "inertia") and not report_has(report, "condim") and not report_has(report, "ref"))
 	check("imports the tendon (Phase 3.6)", not report_has(report, "Tendon") and extras.get_node_or_null("t") is MujocoTendon)
-	check("reports equality constraints", report_has(report, "Equality"))
+	check("imports the equality constraint (Phase 3.7)", not report_has(report, "Equality") and extras.get_node_or_null("a/Equality") is MujocoEquality)
 	check("reports the muscle on the tendon", report_has(report, "activation dynamics"))
 	check("reports sensor noise", report_has(report, "noise"))
 	root.add_child(extras)

@@ -4,6 +4,7 @@
 #include "mujoco_contact_exclude.h"
 #include "mujoco_convert.h"
 #include "mujoco_default.h"
+#include "mujoco_equality.h"
 #include "mujoco_geom.h"
 #include "mujoco_joint.h"
 #include "mujoco_sensor.h"
@@ -137,6 +138,22 @@ Dictionary joint_values(const mjsJoint *p_joint, bool p_degree, bool p_autolimit
     values["ref"] = p_joint->ref * scale;
     values["springref"] = p_joint->springref * scale;
     add_limit_values(values, p_joint->margin, p_joint->solref_limit, p_joint->solimp_limit);
+    values["actuator_force_limited"] = resolve_limited(p_joint->actfrclimited, p_joint->actfrcrange, p_autolimits);
+    values["actuator_force_range"] = Vector2(p_joint->actfrcrange[0], p_joint->actfrcrange[1]);
+    return values;
+}
+
+// Attribute values of an equality class: its solver settings.
+Dictionary equality_values(const mjtNum *p_solref, const mjtNum *p_solimp)
+{
+    Dictionary values;
+    values["solref_timeconst"] = p_solref[0];
+    values["solref_dampratio"] = p_solref[1];
+    values["solimp_dmin"] = p_solimp[0];
+    values["solimp_dmax"] = p_solimp[1];
+    values["solimp_width"] = p_solimp[2];
+    values["solimp_midpoint"] = p_solimp[3];
+    values["solimp_power"] = p_solimp[4];
     return values;
 }
 
@@ -152,6 +169,8 @@ Dictionary tendon_values(const mjsTendon *p_tendon, bool p_autolimits)
     values["armature"] = p_tendon->armature;
     values["spring_length"] = p_tendon->springlength[0];
     add_limit_values(values, p_tendon->margin, p_tendon->solref_limit, p_tendon->solimp_limit);
+    values["actuator_force_limited"] = resolve_limited(p_tendon->actfrclimited, p_tendon->actfrcrange, p_autolimits);
+    values["actuator_force_range"] = Vector2(p_tendon->actfrcrange[0], p_tendon->actfrcrange[1]);
     values["width"] = p_tendon->width;
     values["color"] = Color(p_tendon->rgba[0], p_tendon->rgba[1], p_tendon->rgba[2], p_tendon->rgba[3]);
     return values;
@@ -382,6 +401,7 @@ MujocoWorld *MujocoImporter::import_spec(mjSpec *p_spec)
     nodes[KIND_ACTUATOR].assign(model->nu, 0);
     nodes[KIND_SENSOR].assign(model->nsensor, 0);
     nodes[KIND_TENDON].assign(model->ntendon, 0);
+    nodes[KIND_EQUALITY].assign(model->neq, 0);
     meshes.assign(model->nmesh, Ref<ArrayMesh>());
 
     MujocoWorld *world = memnew(MujocoWorld);
@@ -392,6 +412,7 @@ MujocoWorld *MujocoImporter::import_spec(mjSpec *p_spec)
     import_classes(world);
     import_body_children(mjs_findBody(spec.get(), "world"), world, world, "main");
     import_tendons(world);
+    import_equalities(world);
     import_actuators(world);
     import_sensors(world);
     import_excludes(world);
@@ -450,14 +471,15 @@ void MujocoImporter::import_classes(MujocoWorld *p_world)
 
     const bool degree = spec->compiler.degree != 0;
     const bool autolimits = spec->compiler.autolimits != 0;
-    const char *names[] = { "joint", "geom", "site", "tendon", "actuator" };
-    constexpr int section_count = 5;
+    const char *names[] = { "joint", "geom", "site", "tendon", "equality", "actuator" };
+    constexpr int section_count = 6;
     auto class_values = [&](const mjsDefault *p_def, Dictionary r_sections[section_count]) {
         r_sections[0] = joint_values(p_def->joint, degree, autolimits);
         r_sections[1] = geom_values(p_def->geom);
         r_sections[2] = site_values(p_def->site);
         r_sections[3] = tendon_values(p_def->tendon, autolimits);
-        r_sections[4] = actuator_class_values(p_def->actuator, autolimits);
+        r_sections[4] = equality_values(p_def->equality->solref, p_def->equality->solimp);
+        r_sections[5] = actuator_class_values(p_def->actuator, autolimits);
     };
     // A class overrides only what the file changes from its MuJoCo parent (for
     // main, MuJoCo's built-in defaults). Built-ins the file leaves alone aren't
@@ -607,6 +629,12 @@ void MujocoImporter::import_body_children(mjsBody *p_body, Node *p_node, MujocoW
         }
         if (type != mjJNT_FREE) {
             add_limit_values(values, m->jnt_margin[id], m->jnt_solref + mjNREF * id, m->jnt_solimp + mjNIMP * id);
+        }
+        if (type == mjJNT_HINGE || type == mjJNT_SLIDE) {
+            values["actuator_force_limited"] = m->jnt_actfrclimited[id] != 0;
+            if (m->jnt_actfrclimited[id]) {
+                values["actuator_force_range"] = Vector2(m->jnt_actfrcrange[2 * id], m->jnt_actfrcrange[2 * id + 1]);
+            }
         }
         if (type == mjJNT_FREE && (m->dof_damping[dof] != 0.0 || m->dof_armature[dof] != 0.0 || m->dof_frictionloss[dof] != 0.0)) {
             note("Free joint damping, armature and friction loss are not imported");
@@ -936,9 +964,6 @@ void MujocoImporter::import_tendons(MujocoWorld *p_world)
                 break;
             }
         }
-        if (m->tendon_actfrclimited[id]) {
-            note("Tendon actuator force limits (actuatorfrcrange) are not supported yet and were left out");
-        }
         const mjtNum *spring = m->tendon_lengthspring + 2 * id;
         if (spring[0] != spring[1]) {
             note("Tendon spring dead bands (two springlength values) are not supported yet; the lower length is used");
@@ -953,6 +978,10 @@ void MujocoImporter::import_tendons(MujocoWorld *p_world)
         values["damping"] = m->tendon_damping[id];
         values["frictionloss"] = m->tendon_frictionloss[id];
         values["armature"] = m->tendon_armature[id];
+        values["actuator_force_limited"] = m->tendon_actfrclimited[id] != 0;
+        if (m->tendon_actfrclimited[id]) {
+            values["actuator_force_range"] = Vector2(m->tendon_actfrcrange[2 * id], m->tendon_actfrcrange[2 * id + 1]);
+        }
         // -1 (the length in the scene pose) stays -1, so it follows the scene.
         values["spring_length"] = spec_tendon->springlength[0] == -1.0 ? -1.0 : spring[0];
         add_limit_values(values, m->tendon_margin[id], m->tendon_solref_lim + mjNREF * id, m->tendon_solimp_lim + mjNIMP * id);
@@ -984,6 +1013,83 @@ void MujocoImporter::import_tendons(MujocoWorld *p_world)
             }
         }
         nodes[KIND_TENDON][id] = tendon->get_instance_id();
+    }
+}
+
+void MujocoImporter::import_equalities(MujocoWorld *p_world)
+{
+    const mjModel *m = model.get();
+    for (mjsElement *el = mjs_firstElement(spec.get(), mjOBJ_EQUALITY); el; el = mjs_nextElement(spec.get(), el)) {
+        const int id = mjs_getId(el);
+        const mjsEquality *spec_equality = mjs_asEquality(el);
+        const int type = m->eq_type[id];
+        const int objtype = m->eq_objtype[id];
+        const mjtNum *data = m->eq_data + mjNEQDATA * id;
+
+        // The nodes of the two objects (the world is body 0; -1 is none). The type
+        // says what they are; eq_objtype only tells bodies from sites.
+        auto object_node = [&](int p_id) -> Node * {
+            if (p_id < 0) {
+                return nullptr;
+            }
+            if (type == mjEQ_JOINT) {
+                return node_of<Node>(nodes[KIND_JOINT], p_id);
+            }
+            if (type == mjEQ_TENDON) {
+                return node_of<Node>(nodes[KIND_TENDON], p_id);
+            }
+            if (objtype == mjOBJ_SITE) {
+                return node_of<Node>(nodes[KIND_SITE], p_id);
+            }
+            return p_id == 0 ? static_cast<Node *>(p_world) : node_of<Node>(nodes[KIND_BODY], p_id);
+        };
+        if (type != mjEQ_CONNECT && type != mjEQ_WELD && type != mjEQ_JOINT && type != mjEQ_TENDON) {
+            note("Flex equality constraints are not supported and were left out");
+            continue;
+        }
+        Node *node1 = object_node(m->eq_obj1id[id]);
+        Node *node2 = object_node(m->eq_obj2id[id]);
+        if (!node1 || (m->eq_obj2id[id] >= 0 && !node2)) {
+            note("Equality constraints on left-out elements were left out");
+            continue;
+        }
+
+        MujocoEquality *equality = memnew(MujocoEquality);
+        equality->set_type(static_cast<MujocoEquality::Type>(type));
+        equality->set_active(m->eq_active0[id] != 0);
+        // MuJoCo keeps a torque scale for every type; only welds use it.
+        equality->set_torque_scale(data[10]);
+        switch (type) {
+            case mjEQ_CONNECT:
+                if (objtype != mjOBJ_SITE) {
+                    // The anchor, in body1's frame: the node's position under body1.
+                    equality->set_position(mujoco_convert::to_godot(data));
+                }
+                break;
+            case mjEQ_WELD: {
+                // The file's own anchor and relative pose (the spec keeps them unresolved:
+                // a quaternion of zeros means the scene pose, which is all we have).
+                const double *spec_data = spec_equality->data;
+                const bool explicit_pose = spec_data[6] != 0.0 || spec_data[7] != 0.0 || spec_data[8] != 0.0 || spec_data[9] != 0.0;
+                if (explicit_pose || spec_data[0] != 0.0 || spec_data[1] != 0.0 || spec_data[2] != 0.0) {
+                    note("Weld anchors and relative poses (anchor, relpose) are not supported yet; the scene's relative pose is used");
+                }
+            } break;
+            default:
+                equality->set_poly0(data[0]);
+                equality->set_poly1(data[1]);
+                equality->set_poly2(data[2]);
+                equality->set_poly3(data[3]);
+                equality->set_poly4(data[4]);
+                break;
+        }
+        // Under object1, which it refers to by default (object1 = "..").
+        add_element(equality, node1, node_name(el, "Equality"), el,
+                equality_values(m->eq_solref + mjNREF * id, m->eq_solimp + mjNIMP * id), p_world);
+        if (node2 && node2 != p_world) {
+            equality->set_object2(equality->get_path_to(node2));
+        }
+        nodes[KIND_EQUALITY][id] = equality->get_instance_id();
     }
 }
 
@@ -1167,7 +1273,6 @@ void MujocoImporter::note_unsupported_model_parts()
         mjtSize count;
         const char *what;
     } parts[] = {
-        { m->neq, "Equality constraints are not supported yet and were left out" },
         { m->nkey, "Keyframes are not supported yet and were left out" },
         { m->npair, "Explicit contact pairs are not supported yet and were left out" },
         { m->ncam, "Cameras were left out" },
@@ -1278,6 +1383,10 @@ PackedStringArray MujocoImporter::verify(MujocoWorld *p_world, int p_steps)
             compare("Joint", name, "solimplimit", orig->jnt_solimp + mjNIMP * i, ours->jnt_solimp + mjNIMP * j, mjNIMP, tolerance);
         }
         compare("Joint", name, "stiffness", orig->jnt_stiffness + i, ours->jnt_stiffness + j, 1, tolerance);
+        compare_int("Joint", name, "actuatorfrclimited", orig->jnt_actfrclimited[i], ours->jnt_actfrclimited[j]);
+        if (orig->jnt_actfrclimited[i]) {
+            compare("Joint", name, "actuatorfrcrange", orig->jnt_actfrcrange + 2 * i, ours->jnt_actfrcrange + 2 * j, 2, tolerance);
+        }
         const int a = orig->jnt_dofadr[i], b = ours->jnt_dofadr[j];
         compare("Joint", name, "damping", orig->dof_damping + a, ours->dof_damping + b, 1, tolerance);
         compare("Joint", name, "armature", orig->dof_armature + a, ours->dof_armature + b, 1, tolerance);
@@ -1372,11 +1481,47 @@ PackedStringArray MujocoImporter::verify(MujocoWorld *p_world, int p_steps)
             compare("Tendon", name, "solimplimit", orig->tendon_solimp_lim + mjNIMP * i, ours->tendon_solimp_lim + mjNIMP * j, mjNIMP, tolerance);
         }
         compare("Tendon", name, "stiffness", orig->tendon_stiffness + i, ours->tendon_stiffness + j, 1, tolerance);
+        compare_int("Tendon", name, "actuatorfrclimited", orig->tendon_actfrclimited[i], ours->tendon_actfrclimited[j]);
+        if (orig->tendon_actfrclimited[i]) {
+            compare("Tendon", name, "actuatorfrcrange", orig->tendon_actfrcrange + 2 * i, ours->tendon_actfrcrange + 2 * j, 2, tolerance);
+        }
         compare("Tendon", name, "damping", orig->tendon_damping + i, ours->tendon_damping + j, 1, tolerance);
         compare("Tendon", name, "friction loss", orig->tendon_frictionloss + i, ours->tendon_frictionloss + j, 1, tolerance);
         compare("Tendon", name, "armature", orig->tendon_armature + i, ours->tendon_armature + j, 1, tolerance);
         compare("Tendon", name, "spring length", orig->tendon_lengthspring + 2 * i, ours->tendon_lengthspring + 2 * j, 2, tolerance);
         compare("Tendon", name, "length", orig->tendon_length0 + i, ours->tendon_length0 + j, 1, tolerance);
+    }
+    for (int i = 0; i < orig->neq; i++) {
+        const String name = name_of(mjOBJ_EQUALITY, i);
+        const int j = our_id(KIND_EQUALITY, mjOBJ_EQUALITY, i);
+        if (j < 0) {
+            add(vformat("Equality '%s' was not imported", name));
+            continue;
+        }
+        compare_int("Equality", name, "type", orig->eq_type[i], ours->eq_type[j]);
+        compare_int("Equality", name, "object type", orig->eq_objtype[i], ours->eq_objtype[j]);
+        // The objects, by their nodes (the world is body 0; -1 is none).
+        auto mapped = [&](int p_id) {
+            if (p_id < 0) {
+                return -1;
+            }
+            if (orig->eq_type[i] == mjEQ_JOINT) {
+                return our_id(KIND_JOINT, mjOBJ_JOINT, p_id);
+            }
+            if (orig->eq_type[i] == mjEQ_TENDON) {
+                return our_id(KIND_TENDON, mjOBJ_TENDON, p_id);
+            }
+            if (orig->eq_objtype[i] == mjOBJ_SITE) {
+                return our_id(KIND_SITE, mjOBJ_SITE, p_id);
+            }
+            return p_id == 0 ? 0 : our_id(KIND_BODY, mjOBJ_BODY, p_id);
+        };
+        compare_int("Equality", name, "object 1", mapped(orig->eq_obj1id[i]), ours->eq_obj1id[j]);
+        compare_int("Equality", name, "object 2", mapped(orig->eq_obj2id[i]), ours->eq_obj2id[j]);
+        compare_int("Equality", name, "active", orig->eq_active0[i], ours->eq_active0[j]);
+        compare("Equality", name, "data", orig->eq_data + mjNEQDATA * i, ours->eq_data + mjNEQDATA * j, mjNEQDATA, tolerance);
+        compare("Equality", name, "solref", orig->eq_solref + mjNREF * i, ours->eq_solref + mjNREF * j, mjNREF, tolerance);
+        compare("Equality", name, "solimp", orig->eq_solimp + mjNIMP * i, ours->eq_solimp + mjNIMP * j, mjNIMP, tolerance);
     }
     for (int i = 0; i < orig->nu; i++) {
         const String name = name_of(mjOBJ_ACTUATOR, i);

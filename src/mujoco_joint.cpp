@@ -19,6 +19,8 @@ const MujocoAttribute JOINT_ATTRIBUTES[] = {
     { "frictionloss", Variant::FLOAT, { 0 } }, // dry friction force (or torque)
     { "ref", Variant::FLOAT, { 0 } },          // joint position of the scene pose
     { "springref", Variant::FLOAT, { 0 } },    // spring rest position
+    { "actuator_force_limited", Variant::BOOL, { 0 } },
+    { "actuator_force_range", Variant::VECTOR2, { -1, 1 } },
     // Limit behavior, with MuJoCo's defaults.
     { "limit_margin", Variant::FLOAT, { 0 } },
     { "limit_solref_timeconst", Variant::FLOAT, { 0.02 } },
@@ -80,6 +82,10 @@ void MujocoJoint::write_attributes(mjsJoint *p_joint) const
     p_joint->frictionloss = get_frictionloss();
     p_joint->ref = get_ref();
     p_joint->springref = get_springref();
+    const Vector2 actuator_force_range = get_actuator_force_range();
+    p_joint->actfrclimited = is_actuator_force_limited() ? mjLIMITED_TRUE : mjLIMITED_FALSE;
+    p_joint->actfrcrange[0] = actuator_force_range.x;
+    p_joint->actfrcrange[1] = actuator_force_range.y;
     p_joint->margin = get_limit_margin();
     p_joint->solref_limit[0] = get_limit_solref_timeconst();
     p_joint->solref_limit[1] = get_limit_solref_dampratio();
@@ -198,6 +204,10 @@ void MujocoJoint::_validate_property(PropertyInfo &p_property) const
         p_property.hint_string = type == TYPE_SLIDE ? "-10,10,0.001,or_less,or_greater,suffix:m" : "-360,360,0.1,or_less,or_greater,radians_as_degrees";
     } else if ((name == StringName("limited") || name == StringName("stiffness") || String(name).begins_with("limit_")) && !has_axis) {
         p_property.usage = PROPERTY_USAGE_NONE; // hidden; the value is stored in overrides
+    } else if (String(name).begins_with("actuator_force_") && !single_value) {
+        p_property.usage = PROPERTY_USAGE_NONE; // only hinges and slides are actuated
+    } else if (name == StringName("actuator_force_range") && !is_actuator_force_limited()) {
+        p_property.usage = PROPERTY_USAGE_NONE; // hidden; the value is stored in overrides
     } else if (name == StringName("range")) {
         if (!has_axis || !is_limited()) {
             p_property.usage = PROPERTY_USAGE_NONE; // hidden; the value is stored in overrides
@@ -232,6 +242,10 @@ void MujocoJoint::_bind_methods()
     ClassDB::bind_method(D_METHOD("get_ref"), &MujocoJoint::get_ref);
     ClassDB::bind_method(D_METHOD("set_springref", "springref"), &MujocoJoint::set_springref);
     ClassDB::bind_method(D_METHOD("get_springref"), &MujocoJoint::get_springref);
+    ClassDB::bind_method(D_METHOD("set_actuator_force_limited", "limited"), &MujocoJoint::set_actuator_force_limited);
+    ClassDB::bind_method(D_METHOD("is_actuator_force_limited"), &MujocoJoint::is_actuator_force_limited);
+    ClassDB::bind_method(D_METHOD("set_actuator_force_range", "range"), &MujocoJoint::set_actuator_force_range);
+    ClassDB::bind_method(D_METHOD("get_actuator_force_range"), &MujocoJoint::get_actuator_force_range);
 #define JOINT_BIND_NUMBER(m_name) \
     ClassDB::bind_method(D_METHOD("set_" #m_name, "value"), &MujocoJoint::set_##m_name); \
     ClassDB::bind_method(D_METHOD("get_" #m_name), &MujocoJoint::get_##m_name);
@@ -259,6 +273,10 @@ void MujocoJoint::_bind_methods()
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "frictionloss", PROPERTY_HINT_RANGE, "0,100,0.001,or_greater", PROPERTY_USAGE_EDITOR), "set_frictionloss", "get_frictionloss");
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "ref", PROPERTY_HINT_RANGE, "-360,360,0.1,or_less,or_greater,radians_as_degrees", PROPERTY_USAGE_EDITOR), "set_ref", "get_ref");
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "springref", PROPERTY_HINT_RANGE, "-360,360,0.1,or_less,or_greater,radians_as_degrees", PROPERTY_USAGE_EDITOR), "set_springref", "get_springref");
+
+    ADD_GROUP("Actuator Force", "actuator_force_");
+    ADD_PROPERTY(PropertyInfo(Variant::BOOL, "actuator_force_limited", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_EDITOR), "set_actuator_force_limited", "is_actuator_force_limited");
+    ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "actuator_force_range", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_EDITOR), "set_actuator_force_range", "get_actuator_force_range");
 
     ADD_GROUP("Limit", "limit_");
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "limit_margin", PROPERTY_HINT_RANGE, "0,1,0.0001,or_greater", PROPERTY_USAGE_EDITOR), "set_limit_margin", "get_limit_margin");
@@ -369,3 +387,20 @@ JOINT_NUMBER_ATTRIBUTE(limit_solimp_midpoint)
 JOINT_NUMBER_ATTRIBUTE(limit_solimp_power)
 
 #undef JOINT_NUMBER_ATTRIBUTE
+
+void MujocoJoint::set_actuator_force_limited(bool p_limited)
+{
+    set_attribute("actuator_force_limited", p_limited);
+    notify_property_list_changed();
+    changed();
+}
+
+bool MujocoJoint::is_actuator_force_limited() const { return get_attribute("actuator_force_limited"); }
+
+void MujocoJoint::set_actuator_force_range(const Vector2 &p_range)
+{
+    set_attribute("actuator_force_range", p_range);
+    changed();
+}
+
+Vector2 MujocoJoint::get_actuator_force_range() const { return get_attribute("actuator_force_range"); }

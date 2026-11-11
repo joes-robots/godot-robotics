@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="MujocoEquality" inherits="MujocoElement" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+	</brief_description>
+	<description>
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="active" type="bool" setter="set_active" getter="is_active" default="true">
+		</member>
+		<member name="object1" type="NodePath" setter="set_object1" getter="get_object1" default="NodePath(&quot;..&quot;)">
+		</member>
+		<member name="object2" type="NodePath" setter="set_object2" getter="get_object2" default="NodePath(&quot;&quot;)">
+		</member>
+		<member name="poly0" type="float" setter="set_poly0" getter="get_poly0" default="0.0">
+		</member>
+		<member name="poly1" type="float" setter="set_poly1" getter="get_poly1" default="1.0">
+		</member>
+		<member name="poly2" type="float" setter="set_poly2" getter="get_poly2" default="0.0">
+		</member>
+		<member name="poly3" type="float" setter="set_poly3" getter="get_poly3" default="0.0">
+		</member>
+		<member name="poly4" type="float" setter="set_poly4" getter="get_poly4" default="0.0">
+		</member>
+		<member name="solimp_dmax" type="float" setter="set_solimp_dmax" getter="get_solimp_dmax" default="0.95">
+		</member>
+		<member name="solimp_dmin" type="float" setter="set_solimp_dmin" getter="get_solimp_dmin" default="0.9">
+		</member>
+		<member name="solimp_midpoint" type="float" setter="set_solimp_midpoint" getter="get_solimp_midpoint" default="0.5">
+		</member>
+		<member name="solimp_power" type="float" setter="set_solimp_power" getter="get_solimp_power" default="2.0">
+		</member>
+		<member name="solimp_width" type="float" setter="set_solimp_width" getter="get_solimp_width" default="0.001">
+		</member>
+		<member name="solref_dampratio" type="float" setter="set_solref_dampratio" getter="get_solref_dampratio" default="1.0">
+		</member>
+		<member name="solref_timeconst" type="float" setter="set_solref_timeconst" getter="get_solref_timeconst" default="0.02">
+		</member>
+		<member name="torque_scale" type="float" setter="set_torque_scale" getter="get_torque_scale" default="1.0">
+		</member>
+		<member name="type" type="int" setter="set_type" getter="get_type" enum="MujocoEquality.Type" default="0">
+		</member>
+	</members>
+	<constants>
+		<constant name="TYPE_CONNECT" value="0" enum="Type">
+		</constant>
+		<constant name="TYPE_WELD" value="1" enum="Type">
+		</constant>
+		<constant name="TYPE_JOINT" value="2" enum="Type">
+		</constant>
+		<constant name="TYPE_TENDON" value="3" enum="Type">
+		</constant>
+	</constants>
+</class>

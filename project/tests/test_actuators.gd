@@ -135,3 +135,21 @@ func run() -> void:
 	check("a stray actuator is left out", not elements.has("Box/Stray") and elements.has("Remote"))
 	check("its force is unavailable", stray.get_force() == 0.0)
 	gw.queue_free()
+
+	# A joint can cap the total force of its actuators: a 100 N motor on a slide
+	# limited to 5 N accelerates its 8 kg box at 5 / 8 m/s^2.
+	var cw := make_world("CapWorld")
+	cw.option_gravity = Vector3.ZERO
+	var capped_body: MujocoBody = add(cw, MujocoBody.new(), "Capped")
+	var capped: MujocoJoint = add(capped_body, MujocoJoint.new(), "Slide")
+	capped.type = MujocoJoint.TYPE_SLIDE
+	capped.actuator_force_limited = true
+	capped.actuator_force_range = Vector2(-5, 5)
+	var capped_geom: MujocoGeom = add(capped_body, MujocoGeom.new(), "Geom")
+	capped_geom.size = Vector3(0.2, 0.2, 0.2)
+	var strong: MujocoActuator = add(capped, MujocoActuator.new(), "Motor")
+	strong.ctrl = 100.0
+	await run_until(cw, 1.0)
+	check_near("the joint caps the actuator force", capped.get_joint_velocity(), 5.0 / 8.0, 0.01)
+	check_numbers("actuatorfrcrange in the MJCF", mjcf_elements(cw.get_mjcf()).get("Capped/Slide", {}).get("actuatorfrcrange", "0"), "-5 5")
+	cw.queue_free()

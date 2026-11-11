@@ -1,0 +1,53 @@
+<!-- Equality constraints for test_equality: joint couplings (one from a class, one
+     locking a joint), connects (to the world, and between sites), a weld, and an
+     inactive tendon coupling. Geoms don't collide, so nothing is chaotic. -->
+<mujoco model="equalities">
+  <compiler angle="radian" autolimits="true"/>
+  <default>
+    <geom contype="0" conaffinity="0"/>
+    <equality solref="0.005 1"/>
+    <default class="stiff">
+      <equality solref="0.002 1" solimp="0.99 0.999 0.0001"/>
+    </default>
+  </default>
+  <worldbody>
+    <body name="base" pos="0 0 1">
+      <joint name="j1" axis="0 1 0" damping="1"/>
+      <geom type="capsule" fromto="0 0 0 0.3 0 0" size="0.03"/>
+      <site name="s1" pos="0.3 0 0"/>
+      <body name="link" pos="0.3 0 0">
+        <joint name="j2" axis="0 1 0" damping="1"/>
+        <geom type="capsule" fromto="0 0 0 0.3 0 0" size="0.03"/>
+      </body>
+    </body>
+    <body name="follower" pos="0 0 1">
+      <joint name="j3" axis="0 1 0" damping="1"/>
+      <geom type="capsule" fromto="0 0 0 0.3 0 0" size="0.02"/>
+      <site name="s2" pos="0.3 0 0"/>
+    </body>
+    <body name="hanging" pos="1 0 1">
+      <freejoint/>
+      <geom size="0.05"/>
+    </body>
+    <body name="welded" pos="1.3 0 1">
+      <freejoint/>
+      <geom size="0.05"/>
+    </body>
+    <body name="slider" pos="2 0 1">
+      <joint name="s" type="slide" axis="1 0 0"/>
+      <geom size="0.05"/>
+    </body>
+  </worldbody>
+  <tendon>
+    <fixed name="t1"><joint joint="j1" coef="1"/></fixed>
+    <fixed name="t2"><joint joint="s" coef="1"/></fixed>
+  </tendon>
+  <equality>
+    <joint name="mimic" joint1="j3" joint2="j1" class="stiff"/>
+    <joint name="lock" joint1="j2" polycoef="0.2 0 0 0 0"/>
+    <connect name="hang" body1="hanging" anchor="0 0 0.3"/>
+    <connect name="sites" site1="s1" site2="s2"/>
+    <weld name="glue" body1="welded" body2="hanging" torquescale="2"/>
+    <tendon name="pair" tendon1="t2" tendon2="t1" polycoef="0 0.5 0 0 0" active="false"/>
+  </equality>
+</mujoco>

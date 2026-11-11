@@ -22,6 +22,8 @@ const MujocoAttribute TENDON_ATTRIBUTES[] = {
     { "frictionloss", Variant::FLOAT, { 0 } },
     { "armature", Variant::FLOAT, { 0 } },
     { "spring_length", Variant::FLOAT, { -1 } }, // -1: the length in the scene pose
+    { "actuator_force_limited", Variant::BOOL, { 0 } },
+    { "actuator_force_range", Variant::VECTOR2, { -1, 1 } },
     // Limit behavior, with MuJoCo's defaults (as on joints).
     { "limit_margin", Variant::FLOAT, { 0 } },
     { "limit_solref_timeconst", Variant::FLOAT, { 0.02 } },
@@ -156,6 +158,10 @@ void MujocoTendon::write_attributes(mjsTendon *p_tendon) const
     p_tendon->armature = get_armature();
     p_tendon->springlength[0] = get_spring_length();
     p_tendon->springlength[1] = get_spring_length();
+    const Vector2 actuator_force_range = get_actuator_force_range();
+    p_tendon->actfrclimited = is_actuator_force_limited() ? mjLIMITED_TRUE : mjLIMITED_FALSE;
+    p_tendon->actfrcrange[0] = actuator_force_range.x;
+    p_tendon->actfrcrange[1] = actuator_force_range.y;
     p_tendon->margin = get_limit_margin();
     p_tendon->solref_limit[0] = get_limit_solref_timeconst();
     p_tendon->solref_limit[1] = get_limit_solref_dampratio();
@@ -175,6 +181,12 @@ void MujocoTendon::write_attributes(mjsTendon *p_tendon) const
 void MujocoTendon::write_class_defaults(mjsDefault *p_default)
 {
     write_attributes(p_default->tendon);
+    // MJCF doesn't allow a tendon's actuator force limits in a class (MuJoCo's
+    // writer would still save them, and its parser then rejects the file), so the
+    // class keeps MuJoCo's defaults; each tendon writes its own.
+    p_default->tendon->actfrclimited = mjLIMITED_FALSE;
+    p_default->tendon->actfrcrange[0] = 0.0;
+    p_default->tendon->actfrcrange[1] = 0.0;
 }
 
 void MujocoTendon::inherited_changed()
@@ -320,7 +332,8 @@ void MujocoTendon::_notification(int p_what)
 
 void MujocoTendon::_validate_property(PropertyInfo &p_property) const
 {
-    if (p_property.name == StringName("range") && !is_limited()) {
+    if ((p_property.name == StringName("range") && !is_limited()) ||
+            (p_property.name == StringName("actuator_force_range") && !is_actuator_force_limited())) {
         p_property.usage = PROPERTY_USAGE_NONE; // hidden; the value is stored in overrides
     }
 }
@@ -333,6 +346,10 @@ void MujocoTendon::_bind_methods()
     ClassDB::bind_method(D_METHOD("get_range"), &MujocoTendon::get_range);
     ClassDB::bind_method(D_METHOD("set_color", "color"), &MujocoTendon::set_color);
     ClassDB::bind_method(D_METHOD("get_color"), &MujocoTendon::get_color);
+    ClassDB::bind_method(D_METHOD("set_actuator_force_limited", "limited"), &MujocoTendon::set_actuator_force_limited);
+    ClassDB::bind_method(D_METHOD("is_actuator_force_limited"), &MujocoTendon::is_actuator_force_limited);
+    ClassDB::bind_method(D_METHOD("set_actuator_force_range", "range"), &MujocoTendon::set_actuator_force_range);
+    ClassDB::bind_method(D_METHOD("get_actuator_force_range"), &MujocoTendon::get_actuator_force_range);
 #define TENDON_BIND_NUMBER(m_name) \
     ClassDB::bind_method(D_METHOD("set_" #m_name, "value"), &MujocoTendon::set_##m_name); \
     ClassDB::bind_method(D_METHOD("get_" #m_name), &MujocoTendon::get_##m_name);
@@ -362,6 +379,10 @@ void MujocoTendon::_bind_methods()
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "frictionloss", PROPERTY_HINT_RANGE, "0,100,0.001,or_greater", PROPERTY_USAGE_EDITOR), "set_frictionloss", "get_frictionloss");
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "armature", PROPERTY_HINT_RANGE, "0,10,0.0001,or_greater", PROPERTY_USAGE_EDITOR), "set_armature", "get_armature");
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "spring_length", PROPERTY_HINT_RANGE, "-1,10,0.0001,or_greater", PROPERTY_USAGE_EDITOR), "set_spring_length", "get_spring_length");
+
+    ADD_GROUP("Actuator Force", "actuator_force_");
+    ADD_PROPERTY(PropertyInfo(Variant::BOOL, "actuator_force_limited", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_EDITOR), "set_actuator_force_limited", "is_actuator_force_limited");
+    ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "actuator_force_range", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_EDITOR), "set_actuator_force_range", "get_actuator_force_range");
 
     ADD_GROUP("Limit", "limit_");
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "limit_margin", PROPERTY_HINT_RANGE, "0,1,0.0001,or_greater", PROPERTY_USAGE_EDITOR), "set_limit_margin", "get_limit_margin");
@@ -598,3 +619,20 @@ void MujocoTendonWrap::set_divisor(double p_divisor)
 }
 
 double MujocoTendonWrap::get_divisor() const { return divisor; }
+
+void MujocoTendon::set_actuator_force_limited(bool p_limited)
+{
+    set_attribute("actuator_force_limited", p_limited);
+    notify_property_list_changed();
+    changed();
+}
+
+bool MujocoTendon::is_actuator_force_limited() const { return get_attribute("actuator_force_limited"); }
+
+void MujocoTendon::set_actuator_force_range(const Vector2 &p_range)
+{
+    set_attribute("actuator_force_range", p_range);
+    changed();
+}
+
+Vector2 MujocoTendon::get_actuator_force_range() const { return get_attribute("actuator_force_range"); }

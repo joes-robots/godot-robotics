@@ -31,6 +31,10 @@
 		</method>
 	</methods>
 	<members>
+		<member name="actuator_force_limited" type="bool" setter="set_actuator_force_limited" getter="is_actuator_force_limited" default="false">
+		</member>
+		<member name="actuator_force_range" type="Vector2" setter="set_actuator_force_range" getter="get_actuator_force_range">
+		</member>
 		<member name="armature" type="float" setter="set_armature" getter="get_armature" default="0.0">
 		</member>
 		<member name="damping" type="float" setter="set_damping" getter="get_damping" default="0.0">
