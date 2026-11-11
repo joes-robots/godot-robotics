@@ -15,6 +15,11 @@
 // by default positions are measured from it. A joint's spring (stiffness) pulls
 // toward springref.
 // Positive hinge rotation follows the right-hand rule about the axis.
+//
+// The Limit group sets how the limits behave when hit (MJCF's margin, solreflimit
+// and solimplimit; named like MujocoGeom's contact solver settings): the limit
+// acts within limit_margin of the range, and is softer with a larger
+// limit_solref_timeconst.
 class MujocoJoint : public MujocoElement {
     GDCLASS(MujocoJoint, MujocoElement);
 
@@ -53,6 +58,22 @@ public:
     double get_ref() const;
     void set_springref(double p_springref);
     double get_springref() const;
+    void set_limit_margin(double p_value);
+    double get_limit_margin() const;
+    void set_limit_solref_timeconst(double p_value);
+    double get_limit_solref_timeconst() const;
+    void set_limit_solref_dampratio(double p_value);
+    double get_limit_solref_dampratio() const;
+    void set_limit_solimp_dmin(double p_value);
+    double get_limit_solimp_dmin() const;
+    void set_limit_solimp_dmax(double p_value);
+    double get_limit_solimp_dmax() const;
+    void set_limit_solimp_width(double p_value);
+    double get_limit_solimp_width() const;
+    void set_limit_solimp_midpoint(double p_value);
+    double get_limit_solimp_midpoint() const;
+    void set_limit_solimp_power(double p_value);
+    double get_limit_solimp_power() const;
 
     // Simulation state of a hinge (radians, rad/s) or slide (meters, m/s) joint.
     // Readable whenever the model has compiled; settable only while the game runs.
@@ -78,7 +99,8 @@ private:
     // Attributes (see mujoco_element.h): type, limited, range (hinge: radians,
     // slide: meters, ball: only y, the maximum angle), damping, stiffness,
     // armature (extra rotor inertia, or mass for slide), frictionloss, ref,
-    // springref.
+    // springref, and the limit settings limit_margin, limit_solref_* and
+    // limit_solimp_* (MuJoCo's margin, solreflimit and solimplimit, by name).
 };
 
 VARIANT_ENUM_CAST(MujocoJoint::Type);

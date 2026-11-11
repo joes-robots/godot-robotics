@@ -162,3 +162,24 @@ func run() -> void:
 	check("exclusion under body1", no_tip != null and no_tip.get_node(no_tip.body2) == world.get_node("base/arm/tip"))
 	check("exclusion with the world", world.get_node_or_null("ContactExclude") is MujocoContactExclude)
 	world.queue_free()
+
+	# An explicit mass of 0 (visual geoms) means no mass in MuJoCo; here that's
+	# density 0, since our mass 0 means "from the density".
+	var massless := importer.import_string("""
+<mujoco>
+  <default><default class="visual"><geom mass="0" contype="0" conaffinity="0"/></default></default>
+  <worldbody>
+    <body name="body" pos="0 0 1">
+      <freejoint/>
+      <geom class="visual" type="box" size="0.5 0.5 0.5"/>
+      <geom name="collision" type="sphere" size="0.1" mass="2"/>
+      <geom name="tiny" type="sphere" size="0.05" pos="0 0 0.2" mass="1e-6"/>
+    </body>
+  </worldbody>
+</mujoco>
+""")
+	diffs = importer.verify(massless, 100)
+	check("a geom with mass 0 adds no mass %s" % [diffs], diffs.is_empty())
+	check_near("its class has density 0", massless.get_node("visual").get("geom/density"), 0.0, 1e-12)
+	check("a tiny mass is kept, not taken for 0", is_equal_approx((massless.get_node("body/tiny") as MujocoGeom).mass, 1e-6))
+	massless.free()

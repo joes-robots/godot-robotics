@@ -26,11 +26,11 @@
 		</member>
 		<member name="gear" type="float" setter="set_gear" getter="get_gear" default="1.0">
 		</member>
-		<member name="joint" type="NodePath" setter="set_joint" getter="get_joint" default="NodePath(&quot;..&quot;)">
-		</member>
 		<member name="kp" type="float" setter="set_kp" getter="get_kp">
 		</member>
 		<member name="kv" type="float" setter="set_kv" getter="get_kv">
+		</member>
+		<member name="target" type="NodePath" setter="set_target" getter="get_target" default="NodePath(&quot;..&quot;)">
 		</member>
 		<member name="type" type="int" setter="set_type" getter="get_type" enum="MujocoActuator.Type" default="0">
 		</member>

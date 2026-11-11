@@ -60,7 +60,7 @@ public:
     // The class this element inherits from, or nullptr for the base defaults.
     MujocoDefault *get_used_class() const;
     // Which section of a default class holds this element type's attributes
-    // ("joint", "geom", "site" or "actuator"), or nullptr if classes don't apply.
+    // ("joint", "geom", "site", "tendon" or "actuator"), or nullptr if classes don't apply.
     virtual const char *get_class_section() const { return nullptr; }
     // Writes this element's resolved attributes into the matching section of a
     // MuJoCo default class (used for the elements inside a MujocoDefault).

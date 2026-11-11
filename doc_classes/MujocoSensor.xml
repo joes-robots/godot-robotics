@@ -42,5 +42,9 @@
 		</constant>
 		<constant name="TYPE_TOUCH" value="10" enum="Type">
 		</constant>
+		<constant name="TYPE_TENDON_POSITION" value="11" enum="Type">
+		</constant>
+		<constant name="TYPE_TENDON_VELOCITY" value="12" enum="Type">
+		</constant>
 	</constants>
 </class>

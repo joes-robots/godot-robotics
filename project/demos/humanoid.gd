@@ -5,8 +5,9 @@ extends Node3D
 ## like a rag doll. It starts over every few seconds with a random nudge, or when R
 ## is pressed.
 ##
-## The import leaves out the model's tendons and joint-limit solver settings (see the
-## report shown when converting), so it doesn't fall exactly as it does in MuJoCo.
+## Its two hamstring tendons (MujocoTendon nodes under the world) couple each hip
+## and knee. The import leaves out only the file's cameras, lights, keyframes and
+## textures, none of which change how it moves.
 
 ## Simulated seconds before starting over.
 @export var restart_after := 4.0

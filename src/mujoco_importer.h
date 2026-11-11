@@ -88,6 +88,7 @@ private:
         KIND_SITE,
         KIND_ACTUATOR,
         KIND_SENSOR,
+        KIND_TENDON,
         KIND_COUNT,
     };
 
@@ -98,6 +99,7 @@ private:
     // Adds the joints, geoms, sites and child bodies of p_body under p_node.
     // p_class is the class in effect there (from the enclosing childclasses).
     void import_body_children(mjsBody *p_body, godot::Node *p_node, MujocoWorld *p_world, const godot::String &p_class);
+    void import_tendons(MujocoWorld *p_world);
     void import_actuators(MujocoWorld *p_world);
     void import_sensors(MujocoWorld *p_world);
     void import_excludes(MujocoWorld *p_world);
@@ -105,10 +107,11 @@ private:
     // The ArrayMesh for the original model's mesh p_id, made on first use.
     godot::Ref<godot::ArrayMesh> mesh_resource(int p_id);
 
-    // Adds p_element under p_parent, sets its class if it differs from p_class,
-    // and overrides the attributes in p_values that differ from what it inherits.
+    // Adds p_element under p_parent, sets its class if it differs from the one it
+    // inherits there, and overrides the attributes in p_values that differ from
+    // what it inherits.
     void add_element(MujocoElement *p_element, godot::Node *p_parent, const godot::String &p_name, mjsElement *p_spec_element,
-            const godot::String &p_class, const godot::Dictionary &p_values, MujocoWorld *p_world);
+            const godot::Dictionary &p_values, MujocoWorld *p_world);
     // The node name for an element: its MJCF name, or p_fallback for unnamed ones.
     static godot::String node_name(mjsElement *p_element, const godot::String &p_fallback);
     // The (node) name of the MuJoCo class an element was created with.

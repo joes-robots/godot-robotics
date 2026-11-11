@@ -20,6 +20,8 @@
 //       so sensors on them read 0 here.
 //   Touch                      (target: MujocoSite)  float, the total normal force of
 //       the contacts inside the site's shape, in newtons
+//   Tendon Position / Velocity (target: MujocoTendon)  float, like
+//       MujocoTendon.get_length() / get_velocity()
 //
 // Readings are updated after every physics frame's steps and after step(); in a
 // pre_step handler they can be one step old.
@@ -39,6 +41,8 @@ public:
         TYPE_GYRO,
         TYPE_VELOCIMETER,
         TYPE_TOUCH,
+        TYPE_TENDON_POSITION,
+        TYPE_TENDON_VELOCITY,
     };
 
     mjsBody *add_to_spec(mjSpec *p_spec, mjsBody *p_body, const godot::Transform3D &p_transform, const godot::String &p_name) override;

@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="MujocoTendon" inherits="MujocoElement" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+	</brief_description>
+	<description>
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="get_length">
+			<return type="float" />
+			<description>
+			</description>
+		</method>
+		<method name="get_velocity">
+			<return type="float" />
+			<description>
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="armature" type="float" setter="set_armature" getter="get_armature" default="0.0">
+		</member>
+		<member name="color" type="Color" setter="set_color" getter="get_color" default="Color(0.5, 0.5, 0.5, 1)">
+		</member>
+		<member name="damping" type="float" setter="set_damping" getter="get_damping" default="0.0">
+		</member>
+		<member name="frictionloss" type="float" setter="set_frictionloss" getter="get_frictionloss" default="0.0">
+		</member>
+		<member name="limit_margin" type="float" setter="set_limit_margin" getter="get_limit_margin" default="0.0">
+		</member>
+		<member name="limit_solimp_dmax" type="float" setter="set_limit_solimp_dmax" getter="get_limit_solimp_dmax" default="0.95">
+		</member>
+		<member name="limit_solimp_dmin" type="float" setter="set_limit_solimp_dmin" getter="get_limit_solimp_dmin" default="0.9">
+		</member>
+		<member name="limit_solimp_midpoint" type="float" setter="set_limit_solimp_midpoint" getter="get_limit_solimp_midpoint" default="0.5">
+		</member>
+		<member name="limit_solimp_power" type="float" setter="set_limit_solimp_power" getter="get_limit_solimp_power" default="2.0">
+		</member>
+		<member name="limit_solimp_width" type="float" setter="set_limit_solimp_width" getter="get_limit_solimp_width" default="0.001">
+		</member>
+		<member name="limit_solref_dampratio" type="float" setter="set_limit_solref_dampratio" getter="get_limit_solref_dampratio" default="1.0">
+		</member>
+		<member name="limit_solref_timeconst" type="float" setter="set_limit_solref_timeconst" getter="get_limit_solref_timeconst" default="0.02">
+		</member>
+		<member name="limited" type="bool" setter="set_limited" getter="is_limited" default="false">
+		</member>
+		<member name="range" type="Vector2" setter="set_range" getter="get_range">
+		</member>
+		<member name="spring_length" type="float" setter="set_spring_length" getter="get_spring_length" default="-1.0">
+		</member>
+		<member name="stiffness" type="float" setter="set_stiffness" getter="get_stiffness" default="0.0">
+		</member>
+		<member name="width" type="float" setter="set_width" getter="get_width" default="0.003">
+		</member>
+	</members>
+</class>

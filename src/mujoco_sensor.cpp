@@ -4,6 +4,7 @@
 #include "mujoco_convert.h"
 #include "mujoco_joint.h"
 #include "mujoco_site.h"
+#include "mujoco_tendon.h"
 #include "mujoco_world.h"
 
 #include <godot_cpp/classes/engine.hpp>
@@ -18,6 +19,7 @@ enum TargetKind {
     TARGET_ACTUATOR, // MujocoActuator
     TARGET_FRAME,    // MujocoSite or MujocoBody
     TARGET_SITE,     // MujocoSite
+    TARGET_TENDON,   // MujocoTendon
 };
 
 enum Output {
@@ -47,6 +49,8 @@ const SensorInfo SENSOR_INFO[] = {
     { mjSENS_GYRO, TARGET_SITE, OUTPUT_LOCAL_VECTOR },
     { mjSENS_VELOCIMETER, TARGET_SITE, OUTPUT_LOCAL_VECTOR },
     { mjSENS_TOUCH, TARGET_SITE, OUTPUT_SCALAR },
+    { mjSENS_TENDONPOS, TARGET_TENDON, OUTPUT_SCALAR },
+    { mjSENS_TENDONVEL, TARGET_TENDON, OUTPUT_SCALAR },
 };
 
 } // namespace
@@ -80,7 +84,7 @@ Node3D *MujocoSensor::find_target(String &r_problem) const
                 return nullptr;
             }
             String actuator_problem;
-            if (!actuator->find_joint(actuator_problem)) {
+            if (!actuator->find_target(actuator_problem)) {
                 r_problem = "The target actuator is left out of the model: " + actuator_problem;
                 return nullptr;
             }
@@ -97,6 +101,20 @@ Node3D *MujocoSensor::find_target(String &r_problem) const
                 return nullptr;
             }
             break;
+        case TARGET_TENDON: {
+            const MujocoTendon *tendon = Object::cast_to<MujocoTendon>(node);
+            if (!tendon) {
+                r_problem = "\"target\" must point to a MujocoTendon.";
+                return nullptr;
+            }
+            std::vector<MujocoTendonWrap *> wraps;
+            bool fixed = false;
+            String tendon_problem;
+            if (!tendon->get_path(wraps, fixed, tendon_problem)) {
+                r_problem = "The target tendon is left out of the model: " + tendon_problem;
+                return nullptr;
+            }
+        } break;
     }
     if (element->get_world() != world) {
         r_problem = "The target belongs to a different MujocoWorld.";
@@ -134,6 +152,9 @@ mjsBody *MujocoSensor::add_to_spec(mjSpec *p_spec, mjsBody *p_body, const Transf
             break;
         case TARGET_SITE:
             sensor->objtype = mjOBJ_SITE;
+            break;
+        case TARGET_TENDON:
+            sensor->objtype = mjOBJ_TENDON;
             break;
     }
     // Element names are node paths relative to the world.
@@ -197,6 +218,8 @@ void MujocoSensor::_bind_methods()
     BIND_ENUM_CONSTANT(TYPE_GYRO);
     BIND_ENUM_CONSTANT(TYPE_VELOCIMETER);
     BIND_ENUM_CONSTANT(TYPE_TOUCH);
+    BIND_ENUM_CONSTANT(TYPE_TENDON_POSITION);
+    BIND_ENUM_CONSTANT(TYPE_TENDON_VELOCITY);
 
     ClassDB::bind_method(D_METHOD("set_type", "type"), &MujocoSensor::set_type);
     ClassDB::bind_method(D_METHOD("get_type"), &MujocoSensor::get_type);
@@ -206,14 +229,15 @@ void MujocoSensor::_bind_methods()
 
     ADD_PROPERTY(PropertyInfo(Variant::INT, "type", PROPERTY_HINT_ENUM,
                          "Joint Position,Joint Velocity,Actuator Force,Frame Position,Frame Orientation,"
-                         "Frame Linear Velocity,Frame Angular Velocity,Accelerometer,Gyro,Velocimeter,Touch"),
+                         "Frame Linear Velocity,Frame Angular Velocity,Accelerometer,Gyro,Velocimeter,Touch,"
+                         "Tendon Position,Tendon Velocity"),
             "set_type", "get_type");
-    ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "target", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "MujocoJoint,MujocoActuator,MujocoSite,MujocoBody"), "set_target", "get_target");
+    ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "target", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "MujocoJoint,MujocoActuator,MujocoSite,MujocoBody,MujocoTendon"), "set_target", "get_target");
 }
 
 void MujocoSensor::set_type(Type p_type)
 {
-    ERR_FAIL_COND_MSG(p_type < TYPE_JOINT_POSITION || p_type > TYPE_TOUCH, vformat("Unsupported sensor type: %d.", p_type));
+    ERR_FAIL_COND_MSG(p_type < TYPE_JOINT_POSITION || p_type > TYPE_TENDON_VELOCITY, vformat("Unsupported sensor type: %d.", p_type));
     type = p_type;
     changed();
 }

@@ -19,6 +19,7 @@
 #include "mujoco_joint.h"
 #include "mujoco_sensor.h"
 #include "mujoco_site.h"
+#include "mujoco_tendon.h"
 #include "mujoco_world.h"
 #include <mujoco/mujoco.h>
 
@@ -83,6 +84,8 @@ void initialize_gdextension_types(ModuleInitializationLevel p_level)
 	GDREGISTER_CLASS(MujocoSite);
 	GDREGISTER_CLASS(MujocoSensor);
 	GDREGISTER_CLASS(MujocoContactExclude);
+	GDREGISTER_CLASS(MujocoTendon);
+	GDREGISTER_CLASS(MujocoTendonWrap);
 	GDREGISTER_CLASS(MujocoImporter);
 }
 

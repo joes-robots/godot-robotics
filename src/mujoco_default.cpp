@@ -3,6 +3,7 @@
 #include "mujoco_geom.h"
 #include "mujoco_joint.h"
 #include "mujoco_site.h"
+#include "mujoco_tendon.h"
 #include "mujoco_world.h"
 
 #include <godot_cpp/core/memory.hpp>
@@ -15,7 +16,8 @@ MujocoDefault::MujocoDefault()
     sections[0] = memnew(MujocoJoint);
     sections[1] = memnew(MujocoGeom);
     sections[2] = memnew(MujocoSite);
-    sections[3] = memnew(MujocoActuator);
+    sections[3] = memnew(MujocoTendon);
+    sections[4] = memnew(MujocoActuator);
     for (MujocoElement *element : sections) {
         element->class_owner = this;
         // A section's visible properties depend on its values (e.g. the geom shape).

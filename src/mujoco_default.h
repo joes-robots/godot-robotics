@@ -8,8 +8,8 @@
 class MujocoElement;
 class MujocoWorld;
 
-// A MuJoCo default class: attribute values that joints, geoms, sites and
-// actuators inherit when they don't set them themselves (MJCF's <default>).
+// A MuJoCo default class: attribute values that joints, geoms, sites, tendons
+// and actuators inherit when they don't set them themselves (MJCF's <default>).
 //
 // Classes are MujocoDefault nodes under a MujocoWorld; the node name is the class
 // name. Nesting them makes a class tree: a nested class inherits from the class
@@ -40,7 +40,7 @@ public:
     MujocoDefault *get_parent_class() const;
 
     // The element holding this class's values for one section ("joint", "geom",
-    // "site" or "actuator"), or nullptr. Its overrides are this class's overrides.
+    // "site", "tendon" or "actuator"), or nullptr. Its overrides are this class's overrides.
     MujocoElement *get_section_element(const char *p_section) const;
     // Writes this class's resolved values into p_default.
     void write_to_spec(mjsDefault *p_default) const;
@@ -66,7 +66,7 @@ private:
     // nullptr if p_name isn't one of this class's properties.
     MujocoElement *split_property(const godot::StringName &p_name, godot::StringName &r_property) const;
 
-    static constexpr int SECTION_COUNT = 4;
+    static constexpr int SECTION_COUNT = 5;
     // Not in the scene tree; owned by this node.
     MujocoElement *sections[SECTION_COUNT] = {};
 };

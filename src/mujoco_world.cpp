@@ -1,4 +1,5 @@
 #include "mujoco_world.h"
+#include "mujoco_tendon.h"
 #include "mujoco_actuator.h"
 #include "mujoco_default.h"
 #include "mujoco_element.h"
@@ -192,6 +193,7 @@ void MujocoWorld::compile()
 
     building_bodies.clear();
     building_actuators.clear();
+    building_tendons.clear();
     add_subtree(this, new_spec.get(), mjs_findBody(new_spec.get(), "world"), Transform3D());
 
     std::unique_ptr<mjModel, MjModelDeleter> new_model(mj_compile(new_spec.get(), nullptr));
@@ -252,6 +254,9 @@ void MujocoWorld::compile()
     if (!Engine::get_singleton()->is_editor_hint() && is_inside_tree()) {
         sync_bodies();
     }
+    tendon_nodes = std::move(building_tendons);
+    building_tendons.clear();
+    sync_tendons();
 
     clear_compile_error();
     UtilityFunctions::print_verbose(vformat("MuJoCo: compiled model '%s'.", get_name()));
@@ -283,6 +288,9 @@ void MujocoWorld::add_subtree(Node *p_node, mjSpec *p_spec, mjsBody *p_body, con
         }
         if (Object::cast_to<MujocoActuator>(child)) {
             building_actuators.push_back(child->get_instance_id());
+        }
+        if (Object::cast_to<MujocoTendon>(child)) {
+            building_tendons.push_back(child->get_instance_id());
         }
         // A new body starts a new frame for its descendants.
         add_subtree(child, p_spec, child_body, child_body == p_body ? to_body : Transform3D());
@@ -434,6 +442,7 @@ void MujocoWorld::end_frame()
     // simulation: the next mj_step computes the same quantities from the same state.
     mj_forward(model.get(), data.get());
     sync_bodies();
+    sync_tendons();
 }
 
 void MujocoWorld::step_once()
@@ -520,6 +529,7 @@ void MujocoWorld::state_changed()
     if (!Engine::get_singleton()->is_editor_hint()) {
         sync_bodies();
     }
+    sync_tendons();
 }
 
 void MujocoWorld::add_body_wrench(int p_body_id, const mjtNum p_force[3], const mjtNum p_torque[3])
@@ -563,6 +573,15 @@ void MujocoWorld::sync_bodies()
             continue;
         }
         node->set_global_transform(world_transform * mujoco_convert::to_godot(data->xpos + 3 * id, data->xquat + 4 * id));
+    }
+}
+
+void MujocoWorld::sync_tendons()
+{
+    for (uint64_t node_id : tendon_nodes) {
+        if (MujocoTendon *tendon = Object::cast_to<MujocoTendon>(ObjectDB::get_instance(node_id))) {
+            tendon->update_drawing();
+        }
     }
 }
 

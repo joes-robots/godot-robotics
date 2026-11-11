@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="MujocoTendonWrap" inherits="Node" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+	</brief_description>
+	<description>
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="coef" type="float" setter="set_coef" getter="get_coef" default="1.0">
+		</member>
+		<member name="divisor" type="float" setter="set_divisor" getter="get_divisor" default="1.0">
+		</member>
+		<member name="side_site" type="NodePath" setter="set_side_site" getter="get_side_site" default="NodePath(&quot;&quot;)">
+		</member>
+		<member name="target" type="NodePath" setter="set_target" getter="get_target" default="NodePath(&quot;&quot;)">
+		</member>
+	</members>
+	<constants>
+		<constant name="KIND_JOINT" value="0" enum="Kind">
+		</constant>
+		<constant name="KIND_SITE" value="1" enum="Kind">
+		</constant>
+		<constant name="KIND_GEOM" value="2" enum="Kind">
+		</constant>
+		<constant name="KIND_PULLEY" value="3" enum="Kind">
+		</constant>
+		<constant name="KIND_INVALID" value="4" enum="Kind">
+		</constant>
+	</constants>
+</class>

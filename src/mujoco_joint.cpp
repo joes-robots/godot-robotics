@@ -19,6 +19,15 @@ const MujocoAttribute JOINT_ATTRIBUTES[] = {
     { "frictionloss", Variant::FLOAT, { 0 } }, // dry friction force (or torque)
     { "ref", Variant::FLOAT, { 0 } },          // joint position of the scene pose
     { "springref", Variant::FLOAT, { 0 } },    // spring rest position
+    // Limit behavior, with MuJoCo's defaults.
+    { "limit_margin", Variant::FLOAT, { 0 } },
+    { "limit_solref_timeconst", Variant::FLOAT, { 0.02 } },
+    { "limit_solref_dampratio", Variant::FLOAT, { 1.0 } },
+    { "limit_solimp_dmin", Variant::FLOAT, { 0.9 } },
+    { "limit_solimp_dmax", Variant::FLOAT, { 0.95 } },
+    { "limit_solimp_width", Variant::FLOAT, { 0.001 } },
+    { "limit_solimp_midpoint", Variant::FLOAT, { 0.5 } },
+    { "limit_solimp_power", Variant::FLOAT, { 2.0 } },
 };
 const MujocoAttributeTable JOINT_TABLE = MUJOCO_ATTRIBUTE_TABLE(JOINT_ATTRIBUTES);
 
@@ -71,6 +80,14 @@ void MujocoJoint::write_attributes(mjsJoint *p_joint) const
     p_joint->frictionloss = get_frictionloss();
     p_joint->ref = get_ref();
     p_joint->springref = get_springref();
+    p_joint->margin = get_limit_margin();
+    p_joint->solref_limit[0] = get_limit_solref_timeconst();
+    p_joint->solref_limit[1] = get_limit_solref_dampratio();
+    p_joint->solimp_limit[0] = get_limit_solimp_dmin();
+    p_joint->solimp_limit[1] = get_limit_solimp_dmax();
+    p_joint->solimp_limit[2] = get_limit_solimp_width();
+    p_joint->solimp_limit[3] = get_limit_solimp_midpoint();
+    p_joint->solimp_limit[4] = get_limit_solimp_power();
 }
 
 void MujocoJoint::write_class_defaults(mjsDefault *p_default)
@@ -179,7 +196,7 @@ void MujocoJoint::_validate_property(PropertyInfo &p_property) const
             p_property.usage = PROPERTY_USAGE_NONE; // hidden; the value is stored in overrides
         }
         p_property.hint_string = type == TYPE_SLIDE ? "-10,10,0.001,or_less,or_greater,suffix:m" : "-360,360,0.1,or_less,or_greater,radians_as_degrees";
-    } else if ((name == StringName("limited") || name == StringName("stiffness")) && !has_axis) {
+    } else if ((name == StringName("limited") || name == StringName("stiffness") || String(name).begins_with("limit_")) && !has_axis) {
         p_property.usage = PROPERTY_USAGE_NONE; // hidden; the value is stored in overrides
     } else if (name == StringName("range")) {
         if (!has_axis || !is_limited()) {
@@ -215,6 +232,18 @@ void MujocoJoint::_bind_methods()
     ClassDB::bind_method(D_METHOD("get_ref"), &MujocoJoint::get_ref);
     ClassDB::bind_method(D_METHOD("set_springref", "springref"), &MujocoJoint::set_springref);
     ClassDB::bind_method(D_METHOD("get_springref"), &MujocoJoint::get_springref);
+#define JOINT_BIND_NUMBER(m_name) \
+    ClassDB::bind_method(D_METHOD("set_" #m_name, "value"), &MujocoJoint::set_##m_name); \
+    ClassDB::bind_method(D_METHOD("get_" #m_name), &MujocoJoint::get_##m_name);
+    JOINT_BIND_NUMBER(limit_margin)
+    JOINT_BIND_NUMBER(limit_solref_timeconst)
+    JOINT_BIND_NUMBER(limit_solref_dampratio)
+    JOINT_BIND_NUMBER(limit_solimp_dmin)
+    JOINT_BIND_NUMBER(limit_solimp_dmax)
+    JOINT_BIND_NUMBER(limit_solimp_width)
+    JOINT_BIND_NUMBER(limit_solimp_midpoint)
+    JOINT_BIND_NUMBER(limit_solimp_power)
+#undef JOINT_BIND_NUMBER
     ClassDB::bind_method(D_METHOD("get_joint_position"), &MujocoJoint::get_joint_position);
     ClassDB::bind_method(D_METHOD("set_joint_position", "position"), &MujocoJoint::set_joint_position);
     ClassDB::bind_method(D_METHOD("get_joint_velocity"), &MujocoJoint::get_joint_velocity);
@@ -230,6 +259,16 @@ void MujocoJoint::_bind_methods()
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "frictionloss", PROPERTY_HINT_RANGE, "0,100,0.001,or_greater", PROPERTY_USAGE_EDITOR), "set_frictionloss", "get_frictionloss");
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "ref", PROPERTY_HINT_RANGE, "-360,360,0.1,or_less,or_greater,radians_as_degrees", PROPERTY_USAGE_EDITOR), "set_ref", "get_ref");
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "springref", PROPERTY_HINT_RANGE, "-360,360,0.1,or_less,or_greater,radians_as_degrees", PROPERTY_USAGE_EDITOR), "set_springref", "get_springref");
+
+    ADD_GROUP("Limit", "limit_");
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "limit_margin", PROPERTY_HINT_RANGE, "0,1,0.0001,or_greater", PROPERTY_USAGE_EDITOR), "set_limit_margin", "get_limit_margin");
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "limit_solref_timeconst", PROPERTY_HINT_RANGE, "0.0001,1,0.0001,or_greater,or_less,suffix:s", PROPERTY_USAGE_EDITOR), "set_limit_solref_timeconst", "get_limit_solref_timeconst");
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "limit_solref_dampratio", PROPERTY_HINT_RANGE, "0,2,0.001,or_greater,or_less", PROPERTY_USAGE_EDITOR), "set_limit_solref_dampratio", "get_limit_solref_dampratio");
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "limit_solimp_dmin", PROPERTY_HINT_RANGE, "0.0001,0.9999,0.0001", PROPERTY_USAGE_EDITOR), "set_limit_solimp_dmin", "get_limit_solimp_dmin");
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "limit_solimp_dmax", PROPERTY_HINT_RANGE, "0.0001,0.9999,0.0001", PROPERTY_USAGE_EDITOR), "set_limit_solimp_dmax", "get_limit_solimp_dmax");
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "limit_solimp_width", PROPERTY_HINT_RANGE, "0,1,0.0001,or_greater", PROPERTY_USAGE_EDITOR), "set_limit_solimp_width", "get_limit_solimp_width");
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "limit_solimp_midpoint", PROPERTY_HINT_RANGE, "0,1,0.001", PROPERTY_USAGE_EDITOR), "set_limit_solimp_midpoint", "get_limit_solimp_midpoint");
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "limit_solimp_power", PROPERTY_HINT_RANGE, "1,10,0.01,or_greater", PROPERTY_USAGE_EDITOR), "set_limit_solimp_power", "get_limit_solimp_power");
 }
 
 void MujocoJoint::set_type(Type p_type)
@@ -310,3 +349,23 @@ void MujocoJoint::set_springref(double p_springref)
 }
 
 double MujocoJoint::get_springref() const { return get_attribute("springref"); }
+
+// The limit settings are plain numbers, checked by MuJoCo's compiler.
+#define JOINT_NUMBER_ATTRIBUTE(m_name) \
+    void MujocoJoint::set_##m_name(double p_value) \
+    { \
+        set_attribute(#m_name, p_value); \
+        changed(); \
+    } \
+    double MujocoJoint::get_##m_name() const { return get_attribute(#m_name); }
+
+JOINT_NUMBER_ATTRIBUTE(limit_margin)
+JOINT_NUMBER_ATTRIBUTE(limit_solref_timeconst)
+JOINT_NUMBER_ATTRIBUTE(limit_solref_dampratio)
+JOINT_NUMBER_ATTRIBUTE(limit_solimp_dmin)
+JOINT_NUMBER_ATTRIBUTE(limit_solimp_dmax)
+JOINT_NUMBER_ATTRIBUTE(limit_solimp_width)
+JOINT_NUMBER_ATTRIBUTE(limit_solimp_midpoint)
+JOINT_NUMBER_ATTRIBUTE(limit_solimp_power)
+
+#undef JOINT_NUMBER_ATTRIBUTE

@@ -37,6 +37,22 @@
 		</member>
 		<member name="frictionloss" type="float" setter="set_frictionloss" getter="get_frictionloss" default="0.0">
 		</member>
+		<member name="limit_margin" type="float" setter="set_limit_margin" getter="get_limit_margin" default="0.0">
+		</member>
+		<member name="limit_solimp_dmax" type="float" setter="set_limit_solimp_dmax" getter="get_limit_solimp_dmax" default="0.95">
+		</member>
+		<member name="limit_solimp_dmin" type="float" setter="set_limit_solimp_dmin" getter="get_limit_solimp_dmin" default="0.9">
+		</member>
+		<member name="limit_solimp_midpoint" type="float" setter="set_limit_solimp_midpoint" getter="get_limit_solimp_midpoint" default="0.5">
+		</member>
+		<member name="limit_solimp_power" type="float" setter="set_limit_solimp_power" getter="get_limit_solimp_power" default="2.0">
+		</member>
+		<member name="limit_solimp_width" type="float" setter="set_limit_solimp_width" getter="get_limit_solimp_width" default="0.001">
+		</member>
+		<member name="limit_solref_dampratio" type="float" setter="set_limit_solref_dampratio" getter="get_limit_solref_dampratio" default="1.0">
+		</member>
+		<member name="limit_solref_timeconst" type="float" setter="set_limit_solref_timeconst" getter="get_limit_solref_timeconst" default="0.02">
+		</member>
 		<member name="limited" type="bool" setter="set_limited" getter="is_limited" default="false">
 		</member>
 		<member name="range" type="Vector2" setter="set_range" getter="get_range">

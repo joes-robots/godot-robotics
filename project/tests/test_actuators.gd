@@ -122,7 +122,7 @@ func run() -> void:
 	# The actuator joins the MJCF, targeting its joint by name; an actuator on a separate
 	# joint path works too.
 	var remote: MujocoActuator = add(gw, MujocoActuator.new(), "Remote")
-	remote.joint = NodePath("../Box/Slide")
+	remote.target = NodePath("../Box/Slide")
 	var elements := mjcf_elements(gw.get_mjcf())
 	check("MJCF has the actuator", elements.has("Box/Slide/Actuator"))
 	check("targeting its joint", elements.get("Box/Slide/Actuator", {}).get("joint", "") == "Box/Slide")

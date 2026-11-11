@@ -135,6 +135,8 @@ private:
     void end_frame();
     // Writes the simulated body poses into the MujocoBody nodes.
     void sync_bodies();
+    // Redraws the spatial tendons' paths from the current state.
+    void sync_tendons();
     // Copies each MujocoActuator's ctrl into p_data (which mj_makeData and mj_resetData zero).
     void write_controls(const mjModel *p_model, mjData *p_data) const;
     void report_compile_error(const godot::String &p_error);
@@ -181,6 +183,10 @@ private:
     // Actuator nodes collected while building a spec (instance ids), then for each
     // actuator id of the current model.
     std::vector<uint64_t> building_actuators;
+    // Tendon nodes (instance ids) collected while building a spec, then those of the
+    // current model, for drawing.
+    std::vector<uint64_t> building_tendons;
+    std::vector<uint64_t> tendon_nodes;
     std::vector<uint64_t> actuator_nodes;
 
     // The spec, model and data from the last successful compile.

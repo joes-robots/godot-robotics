@@ -7,13 +7,16 @@
 
 class MujocoJoint;
 
-// A MuJoCo actuator driving a hinge or slide joint. The node's transform is not
-// used; by default it drives its parent joint (`joint` is "..").
+// A MuJoCo actuator driving a hinge or slide joint, or a tendon: `target`, by
+// default its parent (".."). The node's transform is not used.
 //
 // The control input `ctrl` means, by type:
 //   Motor:    force or torque (before gear).
-//   Position: target joint position, like MujocoJoint.get_joint_position().
-//   Velocity: target joint velocity.
+//   Position: target joint position, like MujocoJoint.get_joint_position(), or
+//             target tendon length, like MujocoTendon.get_length().
+//   Velocity: target joint velocity, or rate of change of the tendon length.
+//
+// (Before tendons, `target` was called `joint`; scenes that saved it still load.)
 // The force it produces is gear * actuator force, with the actuator force
 // gain * ctrl + bias (see get_force()).
 //
@@ -36,8 +39,8 @@ public:
 
     void set_type(Type p_type);
     Type get_type() const;
-    void set_joint(const godot::NodePath &p_joint);
-    godot::NodePath get_joint() const;
+    void set_target(const godot::NodePath &p_target);
+    godot::NodePath get_target() const;
     void set_ctrl(double p_ctrl);
     double get_ctrl() const;
     void set_gear(double p_gear);
@@ -61,15 +64,18 @@ public:
 
     // For MujocoWorld: this actuator's id in the current model, or -1.
     int get_actuator_id();
-    // The joint this actuator drives, or nullptr (with the reason in r_problem) if
-    // it has none and is left out of the model.
-    MujocoJoint *find_joint(godot::String &r_problem) const;
+    // The joint or tendon this actuator drives, or nullptr (with the reason in
+    // r_problem) if it has none and is left out of the model.
+    MujocoElement *find_target(godot::String &r_problem) const;
 
 protected:
     static void _bind_methods();
     void _validate_property(godot::PropertyInfo &p_property) const;
     const MujocoAttributeTable *get_attribute_table() const override;
     void overrides_changed() override;
+    // Loads the old `joint` property as `target`.
+    bool _set(const godot::StringName &p_name, const godot::Variant &p_value);
+    bool _get(const godot::StringName &p_name, godot::Variant &r_ret) const;
 
 private:
     void changed();
@@ -80,7 +86,7 @@ private:
     void write_ctrl();
 
     Type type = TYPE_MOTOR;
-    godot::NodePath joint = godot::NodePath("..");
+    godot::NodePath target = godot::NodePath("..");
     double ctrl = 0.0;
     // Attributes (see mujoco_element.h): gear, kp (position: force per unit of
     // position error), kv (position: damping; velocity: force per unit of velocity

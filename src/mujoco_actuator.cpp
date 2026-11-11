@@ -1,5 +1,6 @@
 #include "mujoco_actuator.h"
 #include "mujoco_joint.h"
+#include "mujoco_tendon.h"
 #include "mujoco_world.h"
 
 #include <godot_cpp/classes/engine.hpp>
@@ -32,34 +33,64 @@ void MujocoActuator::overrides_changed()
     changed();
 }
 
-MujocoJoint *MujocoActuator::find_joint(String &r_problem) const
+MujocoElement *MujocoActuator::find_target(String &r_problem) const
 {
     const MujocoWorld *world = get_world();
     if (!world) {
         r_problem = "Not inside a MujocoWorld.";
         return nullptr;
     }
-    MujocoJoint *target = Object::cast_to<MujocoJoint>(get_node_or_null(joint));
-    if (!target) {
-        r_problem = "\"joint\" must point to a MujocoJoint. By default (\"..\") it is the parent node.";
+    Node *node = get_node_or_null(target);
+    MujocoJoint *joint = Object::cast_to<MujocoJoint>(node);
+    MujocoTendon *tendon = Object::cast_to<MujocoTendon>(node);
+    if (!joint && !tendon) {
+        r_problem = "\"target\" must point to a MujocoJoint or a MujocoTendon. By default (\"..\") it is the parent node.";
         return nullptr;
     }
-    if (target->get_world() != world) {
-        r_problem = "The joint belongs to a different MujocoWorld.";
+    MujocoElement *element = joint ? static_cast<MujocoElement *>(joint) : static_cast<MujocoElement *>(tendon);
+    if (element->get_world() != world) {
+        r_problem = "The target belongs to a different MujocoWorld.";
         return nullptr;
     }
-    if (target->get_type() != MujocoJoint::TYPE_HINGE && target->get_type() != MujocoJoint::TYPE_SLIDE) {
+    if (joint && joint->get_type() != MujocoJoint::TYPE_HINGE && joint->get_type() != MujocoJoint::TYPE_SLIDE) {
         r_problem = "Only hinge and slide joints can be actuated.";
         return nullptr;
     }
-    return target;
+    if (tendon) {
+        std::vector<MujocoTendonWrap *> wraps;
+        bool fixed = false;
+        String tendon_problem;
+        if (!tendon->get_path(wraps, fixed, tendon_problem)) {
+            r_problem = "The target tendon is left out of the model: " + tendon_problem;
+            return nullptr;
+        }
+    }
+    return element;
+}
+
+bool MujocoActuator::_set(const StringName &p_name, const Variant &p_value)
+{
+    if (p_name == StringName("joint")) {
+        set_target(p_value);
+        return true;
+    }
+    return MujocoElement::_set(p_name, p_value);
+}
+
+bool MujocoActuator::_get(const StringName &p_name, Variant &r_ret) const
+{
+    if (p_name == StringName("joint")) {
+        r_ret = target;
+        return true;
+    }
+    return false;
 }
 
 mjsBody *MujocoActuator::add_to_spec(mjSpec *p_spec, mjsBody *p_body, const Transform3D & /*p_transform*/, const String &p_name)
 {
     String problem;
-    MujocoJoint *target = find_joint(problem);
-    if (!target) {
+    MujocoElement *target_node = find_target(problem);
+    if (!target_node) {
         // Leave it out rather than fail the whole model. The editor shows the
         // problem as a configuration warning; at runtime, say so once per compile.
         if (!Engine::get_singleton()->is_editor_hint()) {
@@ -70,9 +101,9 @@ mjsBody *MujocoActuator::add_to_spec(mjSpec *p_spec, mjsBody *p_body, const Tran
 
     mjsActuator *actuator = mjs_addActuator(p_spec, get_spec_default(p_spec));
     mjs_setName(actuator->element, p_name.utf8().get_data());
-    actuator->trntype = mjTRN_JOINT;
-    // Joint names are their node paths relative to the world, like this actuator's.
-    mjs_setString(actuator->target, String(get_world()->get_path_to(target)).utf8().get_data());
+    actuator->trntype = Object::cast_to<MujocoTendon>(target_node) ? mjTRN_TENDON : mjTRN_JOINT;
+    // Element names are their node paths relative to the world, like this actuator's.
+    mjs_setString(actuator->target, String(get_world()->get_path_to(target_node)).utf8().get_data());
     write_ranges(actuator);
     const double kp = get_kp();
     const double kv = get_kv();
@@ -126,7 +157,7 @@ PackedStringArray MujocoActuator::_get_configuration_warnings() const
 {
     PackedStringArray warnings = MujocoElement::_get_configuration_warnings();
     String problem;
-    if (get_world() && !find_joint(problem)) {
+    if (get_world() && !find_target(problem)) {
         warnings.push_back(problem + " This actuator is left out of the model.");
     }
     if (is_ctrl_limited() && get_ctrl_range().x >= get_ctrl_range().y) {
@@ -192,8 +223,8 @@ void MujocoActuator::_bind_methods()
 
     ClassDB::bind_method(D_METHOD("set_type", "type"), &MujocoActuator::set_type);
     ClassDB::bind_method(D_METHOD("get_type"), &MujocoActuator::get_type);
-    ClassDB::bind_method(D_METHOD("set_joint", "joint"), &MujocoActuator::set_joint);
-    ClassDB::bind_method(D_METHOD("get_joint"), &MujocoActuator::get_joint);
+    ClassDB::bind_method(D_METHOD("set_target", "target"), &MujocoActuator::set_target);
+    ClassDB::bind_method(D_METHOD("get_target"), &MujocoActuator::get_target);
     ClassDB::bind_method(D_METHOD("set_ctrl", "ctrl"), &MujocoActuator::set_ctrl);
     ClassDB::bind_method(D_METHOD("get_ctrl"), &MujocoActuator::get_ctrl);
     ClassDB::bind_method(D_METHOD("set_gear", "gear"), &MujocoActuator::set_gear);
@@ -213,7 +244,7 @@ void MujocoActuator::_bind_methods()
     ClassDB::bind_method(D_METHOD("get_force"), &MujocoActuator::get_force);
 
     ADD_PROPERTY(PropertyInfo(Variant::INT, "type", PROPERTY_HINT_ENUM, "Motor,Position,Velocity"), "set_type", "get_type");
-    ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "joint", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "MujocoJoint"), "set_joint", "get_joint");
+    ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "target", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "MujocoJoint,MujocoTendon"), "set_target", "get_target");
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "ctrl", PROPERTY_HINT_RANGE, "-100,100,0.001,or_less,or_greater"), "set_ctrl", "get_ctrl");
     // Attribute properties are stored in "overrides", so they are editor-only here.
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "gear", PROPERTY_HINT_RANGE, "-100,100,0.001,or_less,or_greater", PROPERTY_USAGE_EDITOR), "set_gear", "get_gear");
@@ -235,13 +266,13 @@ void MujocoActuator::set_type(Type p_type)
 
 MujocoActuator::Type MujocoActuator::get_type() const { return type; }
 
-void MujocoActuator::set_joint(const NodePath &p_joint)
+void MujocoActuator::set_target(const NodePath &p_target)
 {
-    joint = p_joint;
+    target = p_target;
     changed();
 }
 
-NodePath MujocoActuator::get_joint() const { return joint; }
+NodePath MujocoActuator::get_target() const { return target; }
 
 void MujocoActuator::set_ctrl(double p_ctrl)
 {
