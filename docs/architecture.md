@@ -59,7 +59,7 @@ Design decisions for the MuJoCo extension, in the order they were made. Each ent
 
 - **Override storage (decision 10).** `MujocoElement` holds one `overrides` dictionary: attribute name to value, for the attributes explicitly set on that element. It is the only thing saved to scenes. Reading an attribute returns its override, or else its inherited value. Assigning null removes the override, which is also how the inspector's revert arrow works. "Set to the default's value" and "not set" are therefore different, as in MJCF.
 - **Per element class:** a static table of `MujocoAttribute` rows (name, type, inspector hint), plus a `read` and a `write` function that move one attribute between a Godot value and the MuJoCo spec struct (`mjsGeom`). Inherited values come from `read` on a struct filled in by MuJoCo (`mjs_defaultGeom`), so they can't drift from the library. `add_to_spec` calls `write` for overridden attributes only.
-- **Geom size (decision 6).** Half-sizes as in MuJoCo, laid out along Godot's axes: for boxes and planes, y and z are swapped relative to MJCF. A plane's y is its grid spacing. An unset size is (0.5, 0.5, 0.5), not MuJoCo's 0, because MuJoCo refuses to compile a zero-size geom.
+- **Geom size (decision 6).** Half-sizes as in MuJoCo, laid out along Godot's axes: a box's y and z are swapped relative to MJCF. *The single `size` vector was later replaced by named fields; see milestone 3, "Naming and layout of attributes".*
 - **Mass.** MuJoCo marks "no mass given" with NaN; the `mass` attribute shows that as -1.
 - **Precision.** `Vector3` and `Color` are single precision in standard Godot builds, so sizes, friction and colours carry about 7 significant digits. Scalar attributes (density, mass) are doubles.
 
@@ -81,6 +81,75 @@ Design decisions for the MuJoCo extension, in the order they were made. Each ent
 - An infinite plane is drawn 200 m across.
 - **Selecting in the editor.** The editor tests clicks against gizmos, and only nodes belonging to the scene get gizmos, so the internal mesh can't be clicked. `MujocoGeomGizmoPlugin` (editor only, in `src/mujoco_editor_plugin.cpp`) gives each geom a gizmo whose collision triangles are its shape.
 - **A geom with no `MujocoBody` above it** belongs to MuJoCo's world body: fixed scenery, as with a `<geom>` directly inside `<worldbody>` in MJCF.
+
+## Milestone 3: joints and the runtime API
+
+| # | Decision | Chosen | Alternative | Why |
+|---|----------|--------|-------------|-----|
+| 1 | Joint axis | An `axis` attribute in the joint node's own frame, so rotating the node rotates the axis. | Attribute only, ignoring node rotation; or node orientation only. | Reads like MJCF when the node is unrotated, and the rotate gizmo still works. |
+| 2 | Angle units | Radians in scripts and saved scenes; the inspector shows degrees. The spec is compiled with `compiler.degree = 0`. | Degrees everywhere. | MuJoCo's runtime state is always radians. |
+| 3 | Joint attributes | `type`, `axis`, `limited`, `range_lower`, `range_upper`, `ref`, `springref`, `stiffness`, `damping`, `armature`, `frictionloss`. Limits are a checkbox plus two numbers, greyed out until it is ticked. *Revised after trying it in the editor: a `range` of 0 to 0 read as "locked" when it meant "no limit".* | One `range` vector with no checkbox, limited when set. | Says what it does, and has no x/y labels. |
+| 4 | Where state access lives | Methods on each node for single elements, plus bulk arrays on the world (`qpos`, `qvel`). Each element learns its model id after every compile. | World-only access by name. | Convenient per element, complete for whole-state use. |
+| 5 | Joint state types | `joint_position` and `joint_velocity` are floats, for hinge and slide joints. (Not `position`: that is the node's own, the joint's anchor.) They show in the inspector, greyed out for ball and free joints. | One property whose type depends on the joint type. | The one-number case is nearly all scripted use. |
+| 6 | Moving a body during play | Only a mocap body's move goes into the running simulation. Moving any other body, free-jointed ones included, places it: new rest pose, recompile. | Also teleporting free-jointed bodies without a recompile. | One rule: to drive a body from outside, make it mocap. |
+| 7 | Mocap bodies | A `mocap` attribute on `MujocoBody`. | | MJCF's own mechanism for bodies driven from outside. |
+| 8 | Applying forces | MuJoCo's semantics: `applied_force` and `applied_torque` persist until changed. | Godot-style per-frame `apply_force`. | Maps one-to-one onto `xfrc_applied` and `qfrc_applied`. |
+| 9 | Attribute changes during play | Some attributes are "live" and write straight into the compiled model: joint `damping`, `stiffness`, `frictionloss`, `armature`, `range`; geom `friction`, `rgba`. Others recompile. | Every change recompiles. | Tuning while watching the result. |
+| 10 | Signals | `compiled` and `stepped` on the world. | | Scripts that cache ids or sizes need the first. |
+| 11 | Joint gizmo | Drawn in the editor at the anchor along the axis, clickable, and large enough not to be hidden inside geoms. | | Joints are otherwise invisible. |
+| 12 | Class icons | One per node class. | | The classes are otherwise indistinguishable from `Node3D` in the scene tree. |
+
+### Standing rule: attributes that don't apply are greyed out
+
+An attribute that means nothing in the element's current state (a free joint's axis) stays in the inspector, greyed out (`PROPERTY_USAGE_READ_ONLY`). Its override is kept and is not written to the model, so switching back restores it. An element class implements this with `customize_attribute_property()`; an attribute whose value changes the outcome reports true from `changes_attribute_presentation()` so the inspector is rebuilt.
+
+### Naming and layout of attributes (revised after trying it in the editor)
+
+- **One meaning per field.** MJCF packs several meanings into one attribute (`size`, `friction`, `range`). In the inspector each meaning is its own named attribute: `radius`, `half_length`, `half_extents`, `plane_half_size`, `grid_spacing`; `friction_sliding`, `friction_torsional`, `friction_rolling`; `range_lower`, `range_upper`. `read` and `write` map them onto MuJoCo's packed fields.
+- **Readable names where MJCF's are cryptic:** `color` for `rgba`.
+- **Hidden or greyed out.** Attributes that are alternatives to one another (a geom's size fields) are hidden when they don't belong to the current shape. Attributes that are merely switched off (a free joint's axis, a range while `limited` is off) are greyed out. Either way the stored value is kept and not written to the model.
+- **Geom size defaults** are ours, not MuJoCo's zero: radius 0.5, half-length 0.5, half-extents 0.5, an infinite plane with grid spacing 1. A new geom of any shape compiles as it is.
+- **`limited` with an empty range** (lower not below upper) leaves the joint unlimited instead of failing the compile, since that is the state just after ticking the box.
+- **A default joint is a hinge about the vertical axis** (MuJoCo's default). Gravity doesn't turn it; that is not a limit.
+
+### Joint gizmo (decision 11)
+
+`MujocoJointGizmoPlugin` draws each joint in the editor in its own frame: a hinge as an axis line with an arrowhead and a ring, a slide as a double-headed line, a ball as three rings, a free joint as three short lines. It is drawn on top of everything, and its length is 1.5 times the farthest reach of the geoms on the same body (at least 0.25 m), so geometry never hides it. The lines are also what a click is tested against.
+
+### How decisions 4, 5 and 10 are implemented
+
+- **Ids.** Each element class says what kind of MuJoCo object it is (`get_mujoco_type()`). After a successful compile the world looks every element up by name and gives it its id (`set_mujoco_id()`); -1 means "not in the model". An element that leaves the world drops its id. Scripts read it with `get_mujoco_id()`.
+- **Access to the simulation.** `MujocoWorld::get_model()` and `get_data()` hand element classes the compiled model and its state. After writing state directly, a class calls `state_changed()`, which runs `mj_forward` and moves the body nodes.
+- **Joint state.** `joint_position` and `joint_velocity` read and write the joint's entry in `qpos` and `qvel`. They are ordinary properties shown in the inspector and not saved; `_validate_property` greys them out on ball and free joints and in the editor, and shows a hinge's as degrees. Setting either takes effect at once.
+- **Whole state.** `MujocoWorld.get_qpos()`, `set_qpos()`, `get_qvel()` and `set_qvel()` copy the arrays as they are, in MuJoCo's layout and coordinate convention. `MujocoJoint.get_qpos_address()` and `get_qvel_address()` say where a joint's entries start.
+- **Signals.** `compiled` after each successful compile; `stepped` after the simulation has advanced and the nodes have moved, once per physics frame or per `step()` call.
+
+### How decisions 6 to 8 are implemented
+
+- **Mocap.** `mocap` is a `MujocoBody` attribute written to the spec. Whether a body in the running simulation is mocap is read from the compiled model (`body_mocapid`), not from the attribute.
+- **Being moved.** `MujocoElement` calls the virtual `transform_changed_by_user()` when its node is moved by anything but the simulation; the default asks for a recompile. `MujocoBody` overrides it: a mocap body in a running game writes its pose, relative to the world node, into `mocap_pos` and `mocap_quat` and calls `state_changed()`; anything else sets a new rest pose and recompiles. A mocap body keeps its rest pose, so `reset()` puts it back.
+- **Forces.** `MujocoBody.applied_force` and `applied_torque` are the body's six entries in `xfrc_applied`; `MujocoJoint.applied_force` is the joint's entry in `qfrc_applied`. They are state: shown in the inspector, not saved, greyed out in the editor, cleared by `reset()` and by recompiling.
+- **Velocities.** `MujocoBody.get_linear_velocity()` and `get_angular_velocity()` use `mj_objectVelocity`.
+- **Frames.** Forces, torques and velocities are in Godot's global coordinates. The simulation's frame is the world node's, so they are rotated by the world node's rotation on the way in and out.
+- **Up to date after a step.** `mj_step` computes poses and velocities and then advances the state, leaving them one timestep behind. After each batch of steps the world calls `mj_kinematics`, `mj_comPos` and `mj_comVel`, so nodes and velocities match the state just reached. Contacts and sensor values are not refreshed this way and still describe the previous timestep.
+
+### Class icons (decision 12)
+
+`project/bin/icons/` holds one 16 by 16 SVG per node class, named after the class, in the colour Godot uses for 3D nodes. The `[icons]` section of `mujoco_physics.gdextension` maps each class to its file.
+
+### How decision 9 is implemented
+
+- When an attribute changes, `MujocoElement::apply_attribute_change()` decides how it takes effect. In a running game, for an element that is in the compiled model, it offers the change to the class's `write_live()`. If that returns true the value has been written into the model and nothing else happens; otherwise, and always in the editor, it asks for a recompile.
+- Live for joints: `damping`, `frictionloss`, `armature`, `stiffness`, `limited`, `range_lower`, `range_upper`. Live for geoms: the three friction values and `color`. Everything else rebuilds.
+- `armature` is inertia, and MuJoCo derives constants from the model's inertia. `MujocoWorld::refresh_model_constants()` recomputes them with `mj_setConst`, setting the joint positions aside and restoring them, because that function puts the model into its reference pose.
+- The override is stored in the node as usual, so the next rebuild produces the same model.
+- `to_mjcf()` writes the spec of the last compile, so it does not show live changes made since.
+
+### How decisions 1 to 3 are implemented
+
+- `MujocoJoint::add_to_spec` writes overridden attributes that apply to the joint's type. The axis is then rotated by the node's rotation in its body and converted; it is left at MuJoCo's default when the node is unrotated and no axis is set.
+- `range_lower`, `range_upper`, `ref` and `springref` get a degrees display hint on hinge and ball joints and none on slides, through `customize_attribute_property()`.
+- `stiffness` and `damping` are entry 0 of MuJoCo's polynomial coefficient arrays, i.e. the ordinary constant values.
 
 ## Conventions
 

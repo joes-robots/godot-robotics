@@ -4,6 +4,13 @@ entry_symbol = "mujoco_physics_library_init"
 compatibility_minimum = "4.7"
 reloadable = false
 
+[icons]
+; Shown for each class in the editor's scene tree and Create Node dialog.
+MujocoWorld = "res://bin/icons/MujocoWorld.svg"
+MujocoBody = "res://bin/icons/MujocoBody.svg"
+MujocoGeom = "res://bin/icons/MujocoGeom.svg"
+MujocoJoint = "res://bin/icons/MujocoJoint.svg"
+
 [libraries]
 ; Relative paths ensure that our GDExtension can be placed anywhere in the project directory.
 macos.single.debug = "./macos/libMUJOCO-PHYSICS.macos.template_debug.dylib"

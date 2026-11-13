@@ -1,5 +1,6 @@
 #include "mujoco_world.h"
 
+#include <algorithm>
 #include <string>
 
 #include <godot_cpp/classes/engine.hpp>
@@ -44,6 +45,17 @@ void MujocoWorld::_bind_methods()
     ClassDB::bind_method(D_METHOD("set_paused", "paused"), &MujocoWorld::set_paused);
     ClassDB::bind_method(D_METHOD("is_paused"), &MujocoWorld::is_paused);
     ADD_PROPERTY(PropertyInfo(Variant::BOOL, "paused"), "set_paused", "is_paused");
+
+    ClassDB::bind_method(D_METHOD("get_qpos"), &MujocoWorld::get_qpos);
+    ClassDB::bind_method(D_METHOD("set_qpos", "qpos"), &MujocoWorld::set_qpos);
+    ClassDB::bind_method(D_METHOD("get_qvel"), &MujocoWorld::get_qvel);
+    ClassDB::bind_method(D_METHOD("set_qvel", "qvel"), &MujocoWorld::set_qvel);
+
+    // After a successful compile. Ids, addresses and array sizes may all have changed.
+    ADD_SIGNAL(MethodInfo("compiled"));
+    // After the simulation has advanced and the body nodes have been moved:
+    // once per physics frame, or once per call to step().
+    ADD_SIGNAL(MethodInfo("stepped"));
     ClassDB::bind_method(D_METHOD("is_compiled"), &MujocoWorld::is_compiled);
     ClassDB::bind_method(D_METHOD("get_compile_error"), &MujocoWorld::get_compile_error);
 }
@@ -89,6 +101,9 @@ bool MujocoWorld::compile()
     std::unique_ptr<mjSpec, MjSpecDeleter> new_spec(mj_makeSpec());
     mjs_setString(new_spec->modelname, String(get_name()).utf8().get_data());
     new_spec->option = options;
+    // Angles given to the spec (joint ranges and the like) are in radians.
+    // MuJoCo's default here is degrees, for the benefit of hand-written MJCF.
+    new_spec->compiler.degree = 0;
 
     // Every spec starts with one body, called "world": the fixed root that
     // everything else hangs off.
@@ -106,9 +121,9 @@ bool MujocoWorld::compile()
     model.reset(new_model);
     spec = std::move(new_spec);
 
-    // Match each body node to its body in the new model.
-    body_links.clear();
-    find_bodies(this);
+    // Tell each element which object it became in the new model.
+    body_nodes.clear();
+    assign_ids(this);
 
     // A new model starts from its initial state, with a clean slate.
     time_accumulator = 0.0;
@@ -122,6 +137,7 @@ bool MujocoWorld::compile()
 
     compile_error = String();
     notify_property_list_changed();
+    emit_signal("compiled");
     return true;
 }
 
@@ -169,22 +185,25 @@ void MujocoWorld::add_children_to_spec(Node *p_node, mjSpec *p_spec, mjsBody *p_
     }
 }
 
-// Records every MujocoBody below p_node with its id in the compiled model.
-// Names in the model are node paths, so the lookup is by name.
-void MujocoWorld::find_bodies(Node *p_node)
+// Tells every element below p_node its id in the newly compiled model, and
+// collects the bodies. Names in the model are node paths, so each id is found
+// by name.
+void MujocoWorld::assign_ids(Node *p_node)
 {
     for (int i = 0; i < p_node->get_child_count(); i++) {
         Node *child = p_node->get_child(i);
         if (Object::cast_to<MujocoWorld>(child)) {
             continue;
         }
-        if (const MujocoBody *body = Object::cast_to<MujocoBody>(child)) {
-            const int body_id = mj_name2id(model.get(), mjOBJ_BODY, body->get_mujoco_name().utf8().get_data());
-            if (body_id >= 0) {
-                body_links.push_back({ body->get_instance_id(), body_id });
+        if (MujocoElement *element = Object::cast_to<MujocoElement>(child)) {
+            // -1 if the element didn't make it into the model, e.g. one nested
+            // under a geom.
+            element->set_mujoco_id(mj_name2id(model.get(), element->get_mujoco_type(), element->get_mujoco_name().utf8().get_data()));
+            if (element->get_mujoco_id() >= 0 && Object::cast_to<MujocoBody>(element)) {
+                body_nodes.push_back(element->get_instance_id());
             }
         }
-        find_bodies(child);
+        assign_ids(child);
     }
 }
 
@@ -217,6 +236,7 @@ void MujocoWorld::_physics_process(double p_delta)
         time_accumulator -= steps * timestep;
         advance(steps);
         sync_poses();
+        emit_signal("stepped");
     }
 }
 
@@ -227,6 +247,77 @@ void MujocoWorld::step(int p_steps)
     ERR_FAIL_COND_MSG(simulation_error, "Can't step: the simulation stopped after a MuJoCo error. Call reset().");
     advance(p_steps);
     sync_poses();
+    emit_signal("stepped");
+}
+
+// Positions or velocities were written into the data from outside a step.
+// mj_forward recomputes everything that follows from the state (body poses
+// among them) without advancing time.
+void MujocoWorld::state_changed()
+{
+    if (!model) {
+        return;
+    }
+    mj_forward(model.get(), data.get());
+    sync_poses();
+}
+
+// mj_setConst recomputes the constants MuJoCo derives from the model. It works
+// by putting the model into its reference pose, which overwrites the current
+// positions, so those are set aside and put back afterwards.
+void MujocoWorld::refresh_model_constants()
+{
+    if (!model) {
+        return;
+    }
+    const std::vector<mjtNum> qpos(data->qpos, data->qpos + model->nq);
+    mj_setConst(model.get(), data.get());
+    std::copy(qpos.begin(), qpos.end(), data->qpos);
+    state_changed();
+}
+
+PackedFloat64Array MujocoWorld::get_qpos() const
+{
+    PackedFloat64Array qpos;
+    if (model) {
+        qpos.resize(model->nq);
+        for (int i = 0; i < model->nq; i++) {
+            qpos[i] = data->qpos[i];
+        }
+    }
+    return qpos;
+}
+
+void MujocoWorld::set_qpos(const PackedFloat64Array &p_qpos)
+{
+    ERR_FAIL_COND_MSG(!model, "Can't set qpos: the model hasn't compiled.");
+    ERR_FAIL_COND_MSG(p_qpos.size() != model->nq, String("qpos must have ") + itos(model->nq) + String(" entries, not ") + itos(p_qpos.size()) + String("."));
+    for (int i = 0; i < model->nq; i++) {
+        data->qpos[i] = p_qpos[i];
+    }
+    state_changed();
+}
+
+PackedFloat64Array MujocoWorld::get_qvel() const
+{
+    PackedFloat64Array qvel;
+    if (model) {
+        qvel.resize(model->nv);
+        for (int i = 0; i < model->nv; i++) {
+            qvel[i] = data->qvel[i];
+        }
+    }
+    return qvel;
+}
+
+void MujocoWorld::set_qvel(const PackedFloat64Array &p_qvel)
+{
+    ERR_FAIL_COND_MSG(!model, "Can't set qvel: the model hasn't compiled.");
+    ERR_FAIL_COND_MSG(p_qvel.size() != model->nv, String("qvel must have ") + itos(model->nv) + String(" entries, not ") + itos(p_qvel.size()) + String("."));
+    for (int i = 0; i < model->nv; i++) {
+        data->qvel[i] = p_qvel[i];
+    }
+    state_changed();
 }
 
 // Takes p_steps steps. Returns false if MuJoCo reported an error, after which
@@ -242,6 +333,15 @@ bool MujocoWorld::advance(int p_steps)
             return false;
         }
     }
+
+    // mj_step works out body poses and velocities from the state and then
+    // advances the state, so after it they describe the previous timestep, not
+    // the one just reached. Bring them up to date. These three are the cheap
+    // part of what mj_step does (no collision detection, no solver); the next
+    // step repeats them, which costs little.
+    mj_kinematics(model.get(), data.get()); // body poses
+    mj_comPos(model.get(), data.get());     // centre-of-mass quantities, needed by...
+    mj_comVel(model.get(), data.get());     // ...body velocities
     return true;
 }
 
@@ -254,13 +354,14 @@ void MujocoWorld::sync_poses()
     }
     // MuJoCo's poses are in the frame of its world body, which is this node.
     const Transform3D world_transform = get_global_transform();
-    for (const BodyLink &link : body_links) {
-        MujocoBody *body = Object::cast_to<MujocoBody>(ObjectDB::get_instance(link.node_id));
-        if (!body || !body->is_inside_tree()) {
+    for (uint64_t node_id : body_nodes) {
+        MujocoBody *body = Object::cast_to<MujocoBody>(ObjectDB::get_instance(node_id));
+        if (!body || !body->is_inside_tree() || body->get_mujoco_id() < 0) {
             continue; // freed or removed; a recompile is already on its way
         }
         // xpos and xquat hold every body's pose in the world frame.
-        const Transform3D pose = mujoco_convert::to_godot(&data->xpos[3 * link.body_id], &data->xquat[4 * link.body_id]);
+        const int body_id = body->get_mujoco_id();
+        const Transform3D pose = mujoco_convert::to_godot(&data->xpos[3 * body_id], &data->xquat[4 * body_id]);
         body->set_simulated_pose(world_transform * pose);
     }
 }

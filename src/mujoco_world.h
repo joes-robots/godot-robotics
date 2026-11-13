@@ -30,6 +30,29 @@ public:
     godot::String get_compile_error() const;
     godot::String to_mjcf() const;
 
+    // The compiled model and its simulation state, for element classes to read
+    // and write. Both are nullptr until a compile has succeeded, and both are
+    // replaced by every later successful compile, so don't hold on to them.
+    mjModel *get_model() const { return model.get(); }
+    mjData *get_data() const { return data.get(); }
+    // To be called after writing positions or velocities into the data
+    // directly: recomputes what follows from them and moves the body nodes.
+    void state_changed();
+
+    // To be called after changing a model parameter that MuJoCo derives other
+    // constants from (inertia, in practice). Recomputes them, keeping the
+    // simulation's state.
+    void refresh_model_constants();
+
+    // The whole state as arrays, in MuJoCo's own layout and coordinate
+    // convention (not converted to Godot's): positions of every joint, and
+    // velocities of every degree of freedom. See MujocoJoint for where a
+    // joint's entries are.
+    godot::PackedFloat64Array get_qpos() const;
+    void set_qpos(const godot::PackedFloat64Array &p_qpos);
+    godot::PackedFloat64Array get_qvel() const;
+    void set_qvel(const godot::PackedFloat64Array &p_qvel);
+
     // Simulating
     void step(int p_steps = 1);
     void reset();
@@ -64,7 +87,7 @@ protected:
     void add_children_to_spec(godot::Node *p_node, mjSpec *p_spec, mjsBody *p_body, const godot::Transform3D &p_transform) const;
     void handle_failure(const mjSpec *p_spec);
     void compile_if_pending();
-    void find_bodies(godot::Node *p_node);
+    void assign_ids(godot::Node *p_node);
     bool advance(int p_steps);
     void sync_poses();
 
@@ -82,15 +105,10 @@ private:
     std::unique_ptr<mjModel, MjModelDeleter> model;
     std::unique_ptr<mjData, MjDataDeleter> data;
 
-    // A MujocoBody node and the id of the body it became in the compiled model.
-    // The node is held by its instance id, not a pointer, so a node that has
-    // been freed is noticed instead of used.
-    struct BodyLink {
-        uint64_t node_id;
-        int body_id;
-    };
-    // Every body node in the current model, parents before children.
-    std::vector<BodyLink> body_links;
+    // Every MujocoBody node in the current model, parents before children, for
+    // moving them after each step. Held by instance id, not by pointer, so a
+    // node that has been freed is noticed instead of used.
+    std::vector<uint64_t> body_nodes;
 
     // Automatic stepping in _physics_process is off while this is true.
     bool paused = false;

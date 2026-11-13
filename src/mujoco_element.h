@@ -68,6 +68,16 @@ public:
     // return nullptr, and the world doesn't look at their children.
     virtual mjsBody *add_to_spec(mjSpec *p_spec, mjsBody *p_body, const godot::Transform3D &p_transform) const = 0;
 
+    // Which kind of MuJoCo object this element becomes (body, geom, joint...).
+    virtual mjtObj get_mujoco_type() const = 0;
+
+    // This element's id in the compiled model: its index in the model's arrays
+    // for its kind of object. -1 while it isn't part of a compiled model. The
+    // world sets it after every successful compile; ids can change from one
+    // compile to the next.
+    int get_mujoco_id() const;
+    void set_mujoco_id(int p_id);
+
     // The transform the world should use for this node when building the model.
     // Normally the node's own transform; see MujocoBody for the exception.
     virtual godot::Transform3D get_spec_transform() const;
@@ -85,6 +95,10 @@ protected:
     // Asks the world to recompile. Subclasses call this from property setters.
     void request_recompile();
 
+    // Called when this node is moved by anything other than the simulation.
+    // By default that is an edit to the model, so it asks for a recompile.
+    virtual void transform_changed_by_user();
+
     // True while the simulation, not the user, is moving this node. A move made
     // then is a result of the model, not an edit to it, so it must not recompile.
     bool applying_simulation_pose = false;
@@ -101,6 +115,22 @@ protected:
     bool get_override(int p_index, godot::Variant &r_value) const;
     // Attribute p_index's value in effect: its override, or else what it inherits.
     godot::Variant get_attribute(int p_index) const;
+    // "Live" attributes. Most attribute changes mean rebuilding the model, which
+    // restarts the simulation. Some attributes are plain numbers in the compiled
+    // model that can simply be overwritten while it runs. For those, a subclass
+    // writes the attribute's value in effect into p_world's model here and
+    // returns true; returning false means "this one needs a recompile".
+    // Only called in a running game, for an element that is in the model.
+    virtual bool write_live(int p_index, MujocoWorld &p_world) const;
+
+    // Lets a subclass adjust how attribute p_index is presented in the
+    // inspector, depending on the element's current state: for example greying
+    // out (PROPERTY_USAGE_READ_ONLY) an attribute that doesn't apply to the
+    // current type. If the outcome depends on another attribute, that attribute
+    // must report true from changes_attribute_presentation.
+    virtual void customize_attribute_property(int p_index, godot::PropertyInfo &r_property) const;
+    // True if changing attribute p_index changes how other attributes are presented.
+    virtual bool changes_attribute_presentation(int p_index) const;
     // Called after any attribute's value in effect may have changed. For
     // subclasses that keep something in step with their attributes.
     virtual void attributes_changed();
@@ -119,6 +149,11 @@ protected:
     bool _property_get_revert(const godot::StringName &p_name, godot::Variant &r_value) const;
 
 private:
+    int mujoco_id = -1;
+
+    // Makes a changed attribute take effect: live if possible, else by recompiling.
+    void apply_attribute_change(int p_index);
+
     // Attribute name -> value, for the attributes explicitly set on this element.
     godot::Dictionary overrides;
 };

@@ -26,6 +26,30 @@ protected:
     static void _bind_methods() {}
 };
 
+// Draws each MujocoJoint in the editor, so it can be seen and clicked:
+//
+//   hinge   a line along the axis with an arrowhead, and a ring around it
+//   slide   a line along the axis with an arrowhead at each end
+//   ball    three rings, one about each of the node's axes
+//   free    three short lines along the node's axes
+//
+// It is drawn on top of everything else and sized to reach beyond the geoms on
+// the same body, so geometry never hides it.
+class MujocoJointGizmoPlugin : public godot::EditorNode3DGizmoPlugin {
+    GDCLASS(MujocoJointGizmoPlugin, godot::EditorNode3DGizmoPlugin);
+
+public:
+    bool _has_gizmo(godot::Node3D *p_node) const override;
+    godot::String _get_gizmo_name() const override;
+    void _redraw(const godot::Ref<godot::EditorNode3DGizmo> &p_gizmo) override;
+
+protected:
+    static void _bind_methods() {}
+
+private:
+    bool material_created = false;
+};
+
 // Installs the editor additions above while the editor is running.
 class MujocoEditorPlugin : public godot::EditorPlugin {
     GDCLASS(MujocoEditorPlugin, godot::EditorPlugin);
@@ -39,4 +63,5 @@ protected:
 
 private:
     godot::Ref<MujocoGeomGizmoPlugin> geom_gizmo_plugin;
+    godot::Ref<MujocoJointGizmoPlugin> joint_gizmo_plugin;
 };

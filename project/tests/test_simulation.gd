@@ -128,7 +128,6 @@ func test_resting_on_floor() -> void:
 	world.paused = true
 	var floor_geom := new_node("MujocoGeom", world, "Ground")
 	floor_geom.shape = ClassDB.class_get_integer_constant("MujocoGeom", "SHAPE_PLANE")
-	floor_geom.size = Vector3(0, 0.1, 0)  # infinite plane
 	var box := new_free_box(world, "Box", Vector3(0, 2, 0))
 	check("compiles", world.compile())
 	world.step(1500)  # 3 seconds

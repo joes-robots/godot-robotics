@@ -22,36 +22,38 @@ func run() -> void:
 
 	# Godot meshes take full sizes; MuJoCo sizes are half-sizes.
 	geom.shape = ClassDB.class_get_integer_constant("MujocoGeom", "SHAPE_BOX")
-	geom.size = Vector3(1, 2, 3)
+	geom.half_extents = Vector3(1, 2, 3)
 	var box := visual.mesh as BoxMesh
 	check("box is drawn at twice the half-extents", box != null and box.size.is_equal_approx(Vector3(2, 4, 6)))
 
 	geom.shape = ClassDB.class_get_integer_constant("MujocoGeom", "SHAPE_CAPSULE")
-	geom.size = Vector3(0.1, 0.4, 0)
+	geom.radius = 0.1
+	geom.half_length = 0.4
 	var capsule := visual.mesh as CapsuleMesh
 	# Half-length 0.4 is the cylindrical part: total height is 2 * 0.4 + 2 * 0.1.
 	check("capsule height includes its caps", capsule != null and is_equal_approx(capsule.radius, 0.1) and is_equal_approx(capsule.height, 1.0))
 
 	geom.shape = ClassDB.class_get_integer_constant("MujocoGeom", "SHAPE_CYLINDER")
-	geom.size = Vector3(0.2, 0.3, 0)
+	geom.radius = 0.2
+	geom.half_length = 0.3
 	var cylinder := visual.mesh as CylinderMesh
 	check("cylinder", cylinder != null and is_equal_approx(cylinder.top_radius, 0.2)
 			and is_equal_approx(cylinder.bottom_radius, 0.2) and is_equal_approx(cylinder.height, 0.6))
 
 	geom.shape = ClassDB.class_get_integer_constant("MujocoGeom", "SHAPE_PLANE")
-	geom.size = Vector3(4, 0.1, 5)
+	geom.plane_half_size = Vector2(4, 5)
 	var plane := visual.mesh as PlaneMesh
 	check("plane", plane != null and plane.size.is_equal_approx(Vector2(8, 10)))
-	geom.size = Vector3(0, 0.1, 0)
+	geom.plane_half_size = Vector2.ZERO
 	check("an infinite plane is drawn large", (visual.mesh as PlaneMesh).size.x >= 100)
 
 	# Colour, including transparency.
-	geom.rgba = Color(1, 0, 0, 0.5)
+	geom.color = Color(1, 0, 0, 0.5)
 	material = visual.material_override as StandardMaterial3D
-	check("colour follows rgba", material.albedo_color.is_equal_approx(Color(1, 0, 0, 0.5)))
+	check("the drawing follows the color attribute", material.albedo_color.is_equal_approx(Color(1, 0, 0, 0.5)))
 	check("a translucent colour draws translucent", material.transparency == BaseMaterial3D.TRANSPARENCY_ALPHA)
-	geom.rgba = null
-	check("reverting rgba restores the default colour",
+	geom.color = null
+	check("reverting color restores the default colour",
 			(visual.material_override as StandardMaterial3D).albedo_color.is_equal_approx(Color(0.5, 0.5, 0.5, 1)))
 
 	# The drawing doesn't disturb the model.

@@ -2,6 +2,8 @@
 
 #include <godot_cpp/variant/utility_functions.hpp>
 
+#include <godot_cpp/classes/engine.hpp>
+
 #include "mujoco_world.h"
 
 using namespace godot;
@@ -16,6 +18,7 @@ MujocoElement::MujocoElement()
 void MujocoElement::_bind_methods()
 {
     ClassDB::bind_method(D_METHOD("get_mujoco_name"), &MujocoElement::get_mujoco_name);
+    ClassDB::bind_method(D_METHOD("get_mujoco_id"), &MujocoElement::get_mujoco_id);
 
     ClassDB::bind_method(D_METHOD("has_override", "name"), &MujocoElement::has_override);
     ClassDB::bind_method(D_METHOD("clear_override", "name"), &MujocoElement::clear_override);
@@ -46,9 +49,24 @@ String MujocoElement::get_mujoco_name() const
     return String(world->get_path_to(const_cast<MujocoElement *>(this)));
 }
 
+int MujocoElement::get_mujoco_id() const
+{
+    return mujoco_id;
+}
+
+void MujocoElement::set_mujoco_id(int p_id)
+{
+    mujoco_id = p_id;
+}
+
 Transform3D MujocoElement::get_spec_transform() const
 {
     return get_transform();
+}
+
+void MujocoElement::transform_changed_by_user()
+{
+    request_recompile();
 }
 
 void MujocoElement::request_recompile()
@@ -64,15 +82,20 @@ void MujocoElement::request_recompile()
 void MujocoElement::_notification(int p_what)
 {
     switch (p_what) {
-        case NOTIFICATION_ENTER_TREE:
         case NOTIFICATION_EXIT_TREE:
+            // The world is still reachable here, so ask it to recompile, then
+            // let go of the id: outside a world this element is in no model.
+            request_recompile();
+            mujoco_id = -1;
+            break;
+        case NOTIFICATION_ENTER_TREE:
         case NOTIFICATION_PATH_RENAMED:
         case NOTIFICATION_CHILD_ORDER_CHANGED:
             request_recompile();
             break;
         case NOTIFICATION_LOCAL_TRANSFORM_CHANGED:
             if (!applying_simulation_pose) {
-                request_recompile();
+                transform_changed_by_user();
             }
             break;
     }
@@ -130,6 +153,33 @@ void MujocoElement::attributes_changed()
 {
 }
 
+bool MujocoElement::write_live(int p_index, MujocoWorld &p_world) const
+{
+    return false;
+}
+
+void MujocoElement::apply_attribute_change(int p_index)
+{
+    // In the editor nothing is simulating, so there is no state to protect:
+    // always rebuild, which also keeps the exported model exact.
+    MujocoWorld *world = get_world();
+    const bool can_be_live = p_index >= 0 && world && world->get_model() && mujoco_id >= 0
+            && !Engine::get_singleton()->is_editor_hint();
+    if (can_be_live && write_live(p_index, *world)) {
+        return;
+    }
+    request_recompile();
+}
+
+void MujocoElement::customize_attribute_property(int p_index, PropertyInfo &r_property) const
+{
+}
+
+bool MujocoElement::changes_attribute_presentation(int p_index) const
+{
+    return false;
+}
+
 bool MujocoElement::has_override(const StringName &p_name) const
 {
     return overrides.has(String(p_name));
@@ -138,7 +188,7 @@ bool MujocoElement::has_override(const StringName &p_name) const
 void MujocoElement::clear_override(const StringName &p_name)
 {
     if (overrides.erase(String(p_name))) {
-        request_recompile();
+        apply_attribute_change(find_attribute(p_name));
         attributes_changed();
         // Refreshes the inspector's revert arrow.
         notify_property_list_changed();
@@ -175,7 +225,9 @@ void MujocoElement::get_attribute_property_list(List<PropertyInfo> *r_list) cons
     int count = 0;
     const MujocoAttribute *table = get_attribute_table(count);
     for (int i = 0; i < count; i++) {
-        r_list->push_back(PropertyInfo(table[i].type, table[i].name, table[i].hint, table[i].hint_string, PROPERTY_USAGE_EDITOR));
+        PropertyInfo property(table[i].type, table[i].name, table[i].hint, table[i].hint_string, PROPERTY_USAGE_EDITOR);
+        customize_attribute_property(i, property);
+        r_list->push_back(property);
     }
 }
 
@@ -213,10 +265,13 @@ bool MujocoElement::_set(const StringName &p_name, const Variant &p_value)
 
     const bool was_overridden = overrides.has(name);
     overrides[name] = UtilityFunctions::type_convert(p_value, type);
-    request_recompile();
+    apply_attribute_change(index);
     attributes_changed();
-    if (!was_overridden) {
-        // The revert arrow has just become available.
+    // Rebuild the inspector only when what it shows has changed shape: the
+    // revert arrow has just become available, or other attributes are now
+    // presented differently. (Doing it on every change would interrupt
+    // dragging a value.)
+    if (!was_overridden || changes_attribute_presentation(index)) {
         notify_property_list_changed();
     }
     return true;

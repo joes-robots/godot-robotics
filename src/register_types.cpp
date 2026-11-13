@@ -64,6 +64,7 @@ void initialize_gdextension_types(ModuleInitializationLevel p_level)
 		// Only reached inside the Godot editor. "Internal" classes don't appear
 		// in the editor's lists of node types.
 		GDREGISTER_INTERNAL_CLASS(MujocoGeomGizmoPlugin);
+		GDREGISTER_INTERNAL_CLASS(MujocoJointGizmoPlugin);
 		GDREGISTER_INTERNAL_CLASS(MujocoEditorPlugin);
 		EditorPlugins::add_by_type<MujocoEditorPlugin>();
 		return;
