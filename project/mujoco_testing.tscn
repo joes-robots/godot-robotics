@@ -1,0 +1,5 @@
+[gd_scene format=3 uid="uid://2si35yi8hx1p"]
+
+[node name="MujocoTesting" type="Node3D" unique_id=561550975]
+
+[node name="MujocoWorld" type="MujocoWorld" parent="." unique_id=1646204271 groups=["mujoco"]]
