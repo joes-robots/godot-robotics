@@ -15,6 +15,8 @@
 // Everything that crosses between the two libraries should go through this
 // header, so the convention is written down in exactly one place.
 
+#include <godot_cpp/variant/quaternion.hpp>
+#include <godot_cpp/variant/transform3d.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 #include <mujoco/mujoco.h>
 
@@ -30,6 +32,41 @@ inline void to_mujoco(const godot::Vector3 &p_godot, mjtNum r_mujoco[3]) {
 // Reads a MuJoCo 3-vector as a Godot vector.
 inline godot::Vector3 to_godot(const mjtNum p_mujoco[3]) {
     return godot::Vector3(p_mujoco[0], p_mujoco[2], -p_mujoco[1]);
+}
+
+// Rotations. The change of axes above is itself a rotation, so a rotation's axis
+// converts exactly like any other vector and its angle is unchanged. A unit
+// quaternion is (cos(angle/2), axis * sin(angle/2)), so its vector part converts
+// like a vector and w stays as it is.
+//
+// The two libraries also order the components differently: Godot stores
+// (x, y, z, w), MuJoCo stores (w, x, y, z).
+
+// Writes a Godot rotation into a MuJoCo quaternion (w, x, y, z).
+inline void to_mujoco(const godot::Quaternion &p_godot, mjtNum r_mujoco[4]) {
+    r_mujoco[0] = p_godot.w;
+    r_mujoco[1] = p_godot.x;
+    r_mujoco[2] = -p_godot.z;
+    r_mujoco[3] = p_godot.y;
+}
+
+// Reads a MuJoCo quaternion (w, x, y, z) as a Godot rotation.
+inline godot::Quaternion to_godot_quaternion(const mjtNum p_mujoco[4]) {
+    return godot::Quaternion(p_mujoco[1], p_mujoco[3], -p_mujoco[2], p_mujoco[0]);
+}
+
+// Poses. MuJoCo describes a pose as a position and a quaternion; Godot uses a
+// Transform3D. MuJoCo has no scale, so any scale in the transform is dropped.
+
+// Writes a Godot transform into a MuJoCo position and quaternion.
+inline void to_mujoco(const godot::Transform3D &p_godot, mjtNum r_pos[3], mjtNum r_quat[4]) {
+    to_mujoco(p_godot.origin, r_pos);
+    to_mujoco(p_godot.basis.get_rotation_quaternion(), r_quat);
+}
+
+// Reads a MuJoCo position and quaternion as a Godot transform.
+inline godot::Transform3D to_godot(const mjtNum p_pos[3], const mjtNum p_quat[4]) {
+    return godot::Transform3D(godot::Basis(to_godot_quaternion(p_quat)), to_godot(p_pos));
 }
 
 } // namespace mujoco_convert

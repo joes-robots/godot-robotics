@@ -3,3 +3,26 @@
 [node name="MujocoTesting" type="Node3D" unique_id=561550975]
 
 [node name="MujocoWorld" type="MujocoWorld" parent="." unique_id=1646204271 groups=["mujoco"]]
+
+[node name="MujocoBody" type="MujocoBody" parent="MujocoWorld" unique_id=65464570]
+
+[node name="MujocoGeom" type="MujocoGeom" parent="MujocoWorld/MujocoBody" unique_id=1094554901]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+
+[node name="MujocoJoint" type="MujocoJoint" parent="MujocoWorld/MujocoBody" unique_id=1819828330]
+overrides = {
+"type": 0
+}
+
+[node name="floor" type="MujocoBody" parent="MujocoWorld" unique_id=2086051449]
+
+[node name="floorGeo" type="MujocoGeom" parent="MujocoWorld/floor" unique_id=519430899]
+overrides = {
+"shape": 0,
+"size": Vector3(10, 10, 10)
+}
+
+[node name="Camera3D" type="Camera3D" parent="." unique_id=492063973]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3753668, 1.7729082)
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=2022417711]

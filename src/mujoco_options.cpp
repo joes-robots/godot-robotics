@@ -178,7 +178,7 @@ bool mujoco_options::set(mjOption &p_options, const StringName &p_name, const Va
         } break;
         case Kind::VEC3:
             ERR_FAIL_COND_V_MSG(type != Variant::VECTOR3, true, name + String(" must be a Vector3."));
-            mujoco_convert::to_mujoco(p_value, field<mjtNum>(p_options, option->offset));
+            mujoco_convert::to_mujoco(Vector3(p_value), field<mjtNum>(p_options, option->offset));
             break;
     }
     return true;
