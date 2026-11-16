@@ -16,6 +16,7 @@
 #include "mujoco_editor_plugin.h"
 #include "mujoco_element.h"
 #include "mujoco_geom.h"
+#include "mujoco_importer.h"
 #include "mujoco_joint.h"
 #include "mujoco_world.h"
 
@@ -78,6 +79,7 @@ void initialize_gdextension_types(ModuleInitializationLevel p_level)
 	GDREGISTER_CLASS(MujocoBody);
 	GDREGISTER_CLASS(MujocoGeom);
 	GDREGISTER_CLASS(MujocoJoint);
+	GDREGISTER_CLASS(MujocoImporter);
 }
 
 void uninitialize_gdextension_types(ModuleInitializationLevel p_level) {

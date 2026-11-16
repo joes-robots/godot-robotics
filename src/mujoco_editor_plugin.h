@@ -7,6 +7,12 @@
 #include <godot_cpp/classes/editor_node3d_gizmo_plugin.hpp>
 #include <godot_cpp/classes/editor_plugin.hpp>
 
+namespace godot {
+class AcceptDialog;
+class EditorFileDialog;
+class RichTextLabel;
+}
+
 // Makes a MujocoGeom selectable by clicking it in the 3D viewport.
 //
 // The editor decides what a click hits by asking each node's "gizmo" for its
@@ -50,7 +56,13 @@ private:
     bool material_created = false;
 };
 
-// Installs the editor additions above while the editor is running.
+// Installs the editor additions above while the editor is running, and adds
+// the command Project > Tools > "Import MJCF...".
+//
+// The command asks for an MJCF file, imports it with MujocoImporter, saves the
+// result as a scene (.tscn), opens that scene, and shows what was left out and
+// whether the result matches the original. The scene is an ordinary one made of
+// ordinary nodes: nothing ties it to the MJCF file afterwards.
 class MujocoEditorPlugin : public godot::EditorPlugin {
     GDCLASS(MujocoEditorPlugin, godot::EditorPlugin);
 
@@ -58,10 +70,21 @@ public:
     void _enter_tree() override;
     void _exit_tree() override;
 
+    // The menu command: shows the file dialog.
+    void show_import_dialog();
+    // Called when a file has been chosen in the dialog.
+    void import_mjcf(const godot::String &p_path);
+
 protected:
     static void _bind_methods() {}
 
 private:
     godot::Ref<MujocoGeomGizmoPlugin> geom_gizmo_plugin;
     godot::Ref<MujocoJointGizmoPlugin> joint_gizmo_plugin;
+
+    godot::EditorFileDialog *file_dialog = nullptr;
+    godot::AcceptDialog *result_dialog = nullptr;
+    godot::RichTextLabel *result_text = nullptr;
+
+    void show_result(const godot::String &p_bbcode);
 };

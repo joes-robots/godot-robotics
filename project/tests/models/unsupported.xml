@@ -1,0 +1,23 @@
+<mujoco model="unsupported">
+  <!-- Things the importer has no node or attribute for. Each should be skipped
+       and reported, never approximated. -->
+  <option>
+    <flag gravity="disable"/>
+  </option>
+  <worldbody>
+    <body name="base" gravcomp="1">
+      <inertial pos="0 0 0" mass="2" diaginertia="0.1 0.1 0.1"/>
+      <joint name="pivot" margin="0.01" actuatorfrcrange="-5 5"/>
+      <geom name="egg" type="ellipsoid" size="0.1 0.2 0.3"/>
+      <geom name="pad" type="box" size="0.1 0.1 0.1" condim="4" margin="0.002"/>
+      <site name="tip" pos="0 0 0.3"/>
+    </body>
+  </worldbody>
+  <actuator>
+    <motor name="drive" joint="pivot"/>
+    <motor name="drive2" joint="pivot"/>
+  </actuator>
+  <sensor>
+    <jointpos joint="pivot"/>
+  </sensor>
+</mujoco>

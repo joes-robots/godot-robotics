@@ -19,6 +19,9 @@ void MujocoElement::_bind_methods()
 {
     ClassDB::bind_method(D_METHOD("get_mujoco_name"), &MujocoElement::get_mujoco_name);
     ClassDB::bind_method(D_METHOD("get_mujoco_id"), &MujocoElement::get_mujoco_id);
+    ClassDB::bind_method(D_METHOD("set_mujoco_name_override", "name"), &MujocoElement::set_mujoco_name_override);
+    ClassDB::bind_method(D_METHOD("get_mujoco_name_override"), &MujocoElement::get_mujoco_name_override);
+    ADD_PROPERTY(PropertyInfo(Variant::STRING, "mujoco_name", PROPERTY_HINT_PLACEHOLDER_TEXT, "Node path from the world"), "set_mujoco_name_override", "get_mujoco_name_override");
 
     ClassDB::bind_method(D_METHOD("has_override", "name"), &MujocoElement::has_override);
     ClassDB::bind_method(D_METHOD("clear_override", "name"), &MujocoElement::clear_override);
@@ -45,8 +48,22 @@ String MujocoElement::get_mujoco_name() const
     if (!world) {
         return String();
     }
+    if (!mujoco_name_override.is_empty()) {
+        return mujoco_name_override;
+    }
     // get_path_to isn't declared const in godot-cpp, but it doesn't modify the node.
     return String(world->get_path_to(const_cast<MujocoElement *>(this)));
+}
+
+void MujocoElement::set_mujoco_name_override(const String &p_name)
+{
+    mujoco_name_override = p_name;
+    request_recompile();
+}
+
+String MujocoElement::get_mujoco_name_override() const
+{
+    return mujoco_name_override;
 }
 
 int MujocoElement::get_mujoco_id() const

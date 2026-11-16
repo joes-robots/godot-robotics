@@ -50,10 +50,17 @@ public:
     // The nearest MujocoWorld above this node, or nullptr if there is none.
     MujocoWorld *get_world() const;
 
-    // This element's name in the MuJoCo model: its node path relative to the
-    // world, e.g. "Arm/Forearm". Unique, because node paths are. Empty if the
-    // node is not under a world.
+    // This element's name in the MuJoCo model. Normally its node path relative
+    // to the world, e.g. "Arm/Forearm", which is unique because node paths are.
+    // Empty if the node is not under a world.
+    //
+    // The `mujoco_name` property replaces that with a name of your choosing.
+    // The importer sets it so that an imported model keeps the exact names from
+    // its file. Names must be unique among elements of the same kind; MuJoCo
+    // refuses to compile a model in which they aren't.
     godot::String get_mujoco_name() const;
+    void set_mujoco_name_override(const godot::String &p_name);
+    godot::String get_mujoco_name_override() const;
 
     // Adds this element to p_spec. Called by the world on every compile.
     //
@@ -150,6 +157,8 @@ protected:
 
 private:
     int mujoco_id = -1;
+    // The `mujoco_name` property; empty means "use the node path".
+    godot::String mujoco_name_override;
 
     // Makes a changed attribute take effect: live if possible, else by recompiling.
     void apply_attribute_change(int p_index);

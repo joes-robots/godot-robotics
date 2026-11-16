@@ -151,6 +151,45 @@ An attribute that means nothing in the element's current state (a free joint's a
 - `range_lower`, `range_upper`, `ref` and `springref` get a degrees display hint on hinge and ball joints and none on slides, through `customize_attribute_property()`.
 - `stiffness` and `damping` are entry 0 of MuJoCo's polynomial coefficient arrays, i.e. the ordinary constant values.
 
+## Milestone 3b: MJCF import and verification
+
+| # | Decision | Chosen | Alternative | Why |
+|---|----------|--------|-------------|-----|
+| 1 | What the importer reads from | The parsed spec for structure and names; the compiled model for numbers. | The parsed spec only. | MuJoCo resolves degrees, euler angles, `fromto`, frames and the rest, so the importer can't disagree with it. |
+| 2 | Which values become overrides | Only those that differ from what the node would have anyway. Values from a default class in the file are imported as overrides until default classes exist. | Every value. | An imported tree looks like one built by hand. |
+| 3 | Names | Elements gain an optional `mujoco_name` that replaces the node path. The importer sets it where the path would differ from the file's name. | Accept path names. | The compiled model keeps the file's names, for anything outside that refers to them. |
+| 4 | What can't be represented | Skipped and reported, never approximated: element kinds with no node, unsupported geom shapes, unsupported attributes. | Stand-ins. | A stand-in makes a model look complete when it isn't. |
+| 5 | How import is invoked | A `MujocoImporter` class usable from scripts, and an editor command (Project > Tools). | Script only; or a Godot import plugin. | Testable in the editor; an import plugin would discard edits on re-import. |
+| 6 | What `verify()` compares | Every numeric field of the two compiled models, generically, plus joint positions after 200 steps. | A fixed list of fields. | Can't miss a field we forgot. |
+| 7 | The report | A list of entries with a kind, an element name and a message; available as data and as text. | | Tests check the data; dialogs show the text. |
+
+### How decisions 1 to 4 and 7 are implemented
+
+- `MujocoImporter::build()` compiles the parsed spec, then walks the spec's body tree. For each body it imports its joints, then its geoms, then its child bodies. `mjs_getId()` gives each spec element's index in the compiled model, where the numbers are read.
+- Attributes are set with `set_if_different()`: a value is stored only if it differs from what reading the attribute already gives.
+- Density and mass are read from the spec, because the compiled model keeps mass per body, not per geom.
+- Node names are the file's names made valid for Godot; unnamed elements are `Body`, `Geom`, `Joint` (numbered by Godot when repeated). Every node is owned by the world, so the world saves as a scene.
+- The report counts whole element kinds that were skipped, names each skipped geom and each element with unsupported attributes, and notes flattened default classes. Default classes are counted from the classes the file's geoms and joints use, since MuJoCo offers no list of them; changes to the file's top-level default are imported but not noted.
+
+### How decision 6 is implemented
+
+- `mujoco_compare_models()` (in `src/mujoco_verify.cpp`) compares two compiled models. It uses MuJoCo's own lists of the model's fields (`MJMODEL_SIZES` and `MJMODEL_POINTERS` in `mjxmacro.h`), so every array is covered without naming any.
+- Order: counts first (bodies, joints, geoms and so on), then options, then every array, then names, then the simulation. An array whose length differs between the models is not compared; the count that caused it is already reported.
+- Numbers match if they agree to about six significant digits (1e-6, relative), since Godot's transforms and vectors are single precision. Quaternions are compared up to sign. Joint positions after 200 steps are compared more loosely (1e-4), because small differences grow as a simulation runs.
+- Left out: names of elements the original didn't name, the collision bounding-volume trees (derived, and they reorder at the slightest difference), and memory sizes.
+- `MujocoImporter.verify_file()` and `verify_string()` compile the original and compare it with a world's compiled model. They use fresh simulation data for both, so the world's own simulation is untouched.
+
+### How decision 5 is implemented
+
+- `MujocoEditorPlugin` adds Project > Tools > "Import MJCF...". It asks for a file anywhere on disk, imports it, verifies it (by putting the world in the scene tree for a moment, since a world compiles on entering the tree), saves it as a `.tscn`, opens that scene, and shows the report and the verification result.
+- The scene is saved beside the MJCF file if that is inside the project, otherwise at the project's top level. An existing scene is never overwritten; `_2`, `_3` and so on are added to the name.
+
+### Survey
+
+`scripts/survey_mjcf.sh <folder> [--verbose]` imports every `.xml` under a folder and prints MATCH, DIFFER or FAILED for each, using `project/tools/mjcf_survey.gd`.
+
+Baseline at the end of milestone 3b, on MuJoCo Menagerie (259 files): 13 match, 46 differ, 200 failed. Of the failures, 28 are files MuJoCo can't load on their own (parts of other models), and 172 import but do not compile: with mesh geoms and explicit `<inertial>` elements skipped, their moving bodies are left with no mass. Explicit inertials and meshes are therefore the next things real robot models need.
+
 ## Conventions
 
 - Coordinates: Godot (x, y, z) is MuJoCo (x, -z, y). Godot is y-up, MuJoCo is z-up.
