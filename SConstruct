@@ -5,7 +5,7 @@ import sys
 from methods import print_error
 
 
-libname = "EXTENSION-NAME"
+libname = "MUJOCO-PHYSICS"
 projectdir = "project"
 
 localEnv = Environment(tools=["default"], PLATFORM="")
@@ -35,10 +35,26 @@ Run the following command to download godot-cpp:
     git submodule update --init --recursive""")
     sys.exit(1)
 
-env = SConscript("godot-cpp/SConstruct", {"env": env, "customs": customs})
+with open("MUJOCO_VERSION") as f:
+    mujoco_version = f.read().strip()
+
+if not os.path.isfile("mujoco/include/mujoco/mujoco.h"):
+    print_error("""MuJoCo is not available within this folder.
+Run the following command to download MuJoCo {}:
+
+    scripts/fetch_mujoco.sh""".format(mujoco_version))
+    sys.exit(1)
+
+# api_version is the oldest Godot API the extension may use; keep it equal to
+# compatibility_minimum in project/bin/mujoco_physics.gdextension.
+env = SConscript("godot-cpp/SConstruct", {"env": env, "customs": customs, "api_version": "4.7"})
 
 env.Append(CPPPATH=["src/"])
+env.Append(CPPPATH=["mujoco/include"])
 sources = Glob("src/*.cpp")
+
+env.Append(LIBPATH=["mujoco/lib"])
+env.Append(LIBS=["mujoco"])
 
 if env["target"] in ["editor", "template_debug"]:
     try:
@@ -59,6 +75,8 @@ library = env.SharedLibrary(
 )
 
 copy = env.Install("{}/bin/{}/".format(projectdir, env["platform"]), library)
+mujoco_so = "mujoco/lib/libmujoco.so.{}".format(mujoco_version)
+mujoco_install = env.Install("{}/bin/{}/".format(projectdir, env["platform"]), mujoco_so)
 
-default_args = [library, copy]
+default_args = [library, copy, mujoco_install]
 Default(*default_args)

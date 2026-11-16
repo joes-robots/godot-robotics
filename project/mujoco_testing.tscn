@@ -1,0 +1,12 @@
+[gd_scene format=3 uid="uid://2si35yi8hx1p"]
+
+[ext_resource type="PackedScene" uid="uid://b70wxpt6v50un" path="res://tests/models/arm.tscn" id="1_0rcto"]
+
+[node name="MujocoTesting" type="Node3D" unique_id=561550975]
+
+[node name="Camera3D" type="Camera3D" parent="." unique_id=492063973]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3753668, 1.7729082)
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=2022417711]
+
+[node name="arm" parent="." unique_id=1420309195 instance=ExtResource("1_0rcto")]

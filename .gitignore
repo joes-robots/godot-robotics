@@ -6,6 +6,10 @@
 /bin/**
 !project/bin/*.gdextension
 
+# MuJoCo is downloaded by scripts/fetch_mujoco.sh
+/mujoco/
+MUJOCO_LOG.TXT
+
 # Ignore scons database
 .sconsign*.dblite
 
@@ -22,6 +26,7 @@ compile_commands.json
 *.o
 *.os
 *.so
+*.so.*
 *.obj
 *.bc
 *.pyc

@@ -1,56 +1,79 @@
-# godot-cpp template
-This repository serves as a quickstart template for GDExtension development with Godot 4.0+.
+# MuJoCo for Godot
 
-## Contents
-* Preconfigured source files for C++ development of the GDExtension ([src/](./src/))
-* An empty Godot project in [project/](./project), to test the GDExtension
-* godot-cpp as a submodule (`godot-cpp/`)
-* GitHub Issues template ([.github/ISSUE_TEMPLATE.yml](./.github/ISSUE_TEMPLATE.yml))
-* GitHub CI/CD workflows to publish your library packages when creating a release ([.github/workflows/builds.yml](./.github/workflows/builds.yml))
-* An SConstruct file with various functions, such as boilerplate for [Adding documentation](https://docs.godotengine.org/en/stable/tutorials/scripting/cpp/gdextension_docs_system.html)
+A Godot extension that brings the [MuJoCo](https://mujoco.org) physics simulator into the Godot editor: build a robot or mechanism out of nodes, or import one from an MJCF file, and simulate it with MuJoCo when the scene runs.
 
-## Usage - Template
+> **Work in progress.** This is an early, actively changing project. Node names, properties and saved scenes may change without notice, and large parts of MuJoCo are not covered yet. It is not ready to build other projects on.
 
-To use this template, log in to GitHub and click the green "Use this template" button at the top of the repository page. This will let you create a copy of this repository with a clean git history.
+## Status (November 2026)
 
-To get started with your new GDExtension, do the following:
+Works today:
 
-* clone your repository to your local computer
-* initialize the godot-cpp git submodule via `git submodule update --init`
-* change the name of the compiled library file inside the [SConstruct](./SConstruct) file by modifying the `libname` string.
-  * change the paths of the to be loaded library name inside the [project/bin/example.gdextension](./project/bin/example.gdextension) file, by replacing `EXTENSION-NAME` with the name you chose for `libname`.
-* change the `entry_symbol` string inside [project/bin/example.gdextension](./project/bin/example.gdextension) file.
-  * rename the `example_library_init` function in [src/register_types.cpp](./src/register_types.cpp) to the same name you chose for `entry_symbol`.
-* change the name of the `project/bin/example.gdextension` file
+- Building a model in the editor from `MujocoWorld`, `MujocoBody`, `MujocoGeom` and `MujocoJoint` nodes, and simulating it with MuJoCo when the scene runs.
+- Primitive shapes (plane, sphere, capsule, cylinder, box); free, ball, slide and hinge joints; mocap bodies.
+- Reading and driving the simulation from scripts: joint positions and velocities, applied forces, the whole state as arrays.
+- Changing some properties (joint damping, stiffness and limits, geom friction) while the simulation runs, without restarting it.
+- Importing MJCF files that use only the features above, with a report of what was left out and a check against MuJoCo's own result.
 
-Now, you can build the project with the following command:
+Not yet:
 
-```shell
-scons
+- Meshes and explicit body inertia, which most robot models need. Such models currently import but do not simulate.
+- Actuators, sensors, sites, tendons, constraints and default classes.
+- Any platform other than Linux x86_64.
+
+MuJoCo simulates only the MuJoCo nodes. It does not replace Godot's own physics engine, and the two do not interact.
+
+## Requirements
+
+- Linux, x86_64
+- [Godot](https://godotengine.org) 4.7 or newer
+- A C++ compiler, Python 3 and [SCons](https://scons.org)
+- MuJoCo 3.10.0, which a script downloads for you (below)
+
+## Building
+
+```sh
+git clone --recursive https://github.com/joes-robots/godot-robotics.git
+cd godot-robotics
+scripts/fetch_mujoco.sh   # downloads MuJoCo into ./mujoco
+scons                     # builds the extension into project/bin
 ```
 
-If the build command worked, you can test it with the [project](./project) project. Import it into Godot, open it, and launch the main scene. You should see it print the following line in the console:
+Then open the `project/` folder in Godot.
 
+## Trying it
+
+- **Run the demo.** Open `demos/shapes.tscn` and run it (F6). Four shapes fall onto a floor and a pendulum swings behind them.
+- **Build something.** Add a `MujocoWorld` node. Under it add a `MujocoBody`, and under that a `MujocoGeom` for its shape and a `MujocoJoint` to let it move (set the joint's type to Free for a loose object). A `MujocoGeom` placed directly under the world is fixed scenery, such as a floor.
+- **Import a model.** Choose Project > Tools > Import MJCF... and pick an `.xml` file. `project/tests/models/arm.xml` is a small one that imports completely. The result is saved as an ordinary scene, and a window lists anything that was left out.
+
+## Nodes
+
+| Node | What it is |
+|---|---|
+| `MujocoWorld` | One MuJoCo model and its simulation. Holds the physics options and steps the simulation. |
+| `MujocoBody` | A rigid body. Its transform is its pose relative to its parent body. |
+| `MujocoGeom` | A shape on a body, for collision and mass. Draws itself. |
+| `MujocoJoint` | What lets a body move relative to its parent. A body with no joint is fixed to its parent. |
+
+The node tree is the model: MuJoCo's model is rebuilt from it whenever its structure changes. The reasoning behind this and the other design decisions is in [docs/architecture.md](docs/architecture.md).
+
+## Tests
+
+```sh
+GODOT=/path/to/godot scripts/run_tests.sh               # the test suite
+GODOT=/path/to/godot scripts/survey_mjcf.sh <folder>    # import every MJCF in a folder and compare with MuJoCo
 ```
-Type: 24
-```
 
-### Configuring an IDE
-You can develop your own extension with any text editor and by invoking scons on the command line, but if you want to work with an IDE (Integrated Development Environment), you can use a compilation database file called `compile_commands.json`. Most IDEs should automatically identify this file, and self-configure appropriately.
-To generate the database file, you can run one of the following commands in the project root directory:
-```shell
-# Generate compile_commands.json while compiling
-scons compiledb=yes
+## How this project is developed
 
-# Generate compile_commands.json without compiling
-scons compiledb=yes compile_commands.json
-```
+Most of the code here was written by an AI model (Anthropic's Claude) working under my direction. I make the design decisions, which are recorded with their reasoning in [docs/architecture.md](docs/architecture.md), and I review and try each piece as it lands.
 
-## Usage - Actions
+Correctness is checked by an automated test suite and by comparing imported models against MuJoCo's own compiled result, field by field. If you find something wrong, please open an issue.
 
-This repository comes with continuous integration (CI) through a GitHub action that tests building the GDExtension.
-It triggers automatically for each pushed change. You can find and edit it in [builds.yml](.github/workflows/ci.yml).
+An earlier attempt at this project is kept under the tag `archive/first-pass`.
 
-There is also a workflow ([make_build.yml](.github/workflows/make_build.yml)) that builds the GDExtension for all supported platforms that you can use to create releases.
-You can trigger this workflow manually from the `Actions` tab on GitHub.
-After it is complete, you can find the file `godot-cpp-template.zip` in the `Artifacts` section of the workflow run.
+## License
+
+The code in this repository is released into the public domain; see [LICENSE.md](LICENSE.md).
+
+MuJoCo is a separate project by Google DeepMind, licensed under Apache 2.0. It is not included in this repository; the build downloads it. The extension is built on [godot-cpp](https://github.com/godotengine/godot-cpp), which is MIT licensed.

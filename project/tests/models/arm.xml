@@ -1,0 +1,43 @@
+<mujoco model="arm">
+  <!-- A small model that exercises what the importer supports, written the way
+	   MJCF files usually are: angles in degrees, an euler orientation, a
+	   capsule given by its two ends, a default class. -->
+  <option timestep="0.004" gravity="0 0 -5"/>
+
+  <default>
+	<default class="link">
+	  <geom type="capsule" size="0.05" rgba="0.2 0.4 0.8 1"/>
+	  <joint damping="0.5"/>
+	</default>
+  </default>
+
+  <worldbody>
+	<geom name="floor" type="plane" size="2 3 0.1"/>
+	<geom type="box" size="0.1 0.2 0.3" pos="1 0 0.3"/>
+
+	<body name="upper" pos="0 0 1" euler="0 90 0">
+	  <joint name="shoulder" type="hinge" axis="0 1 0" range="-45 90" armature="0.01" class="link"/>
+	  <geom name="upper_geom" class="link" fromto="0 0 0  0 0 0.4" friction="0.8 0.01 0.002"/>
+
+	  <body name="lower" pos="0 0 0.4">
+		<joint name="elbow" type="hinge" axis="0 1 0" range="0 120" class="link"/>
+		<geom class="link" fromto="0 0 0  0 0 0.3" mass="0.5" contype="2" conaffinity="3"/>
+
+		<!-- A telescoping tip: it slides in and out along the arm, on a spring. -->
+		<body name="tip" pos="0 0 0.3">
+		  <joint name="extend" type="slide" axis="0 0 1" range="-0.1 0.2" stiffness="30" springref="0.05" class="link"/>
+		  <geom type="sphere" size="0.07" density="500"/>
+		</body>
+	  </body>
+	</body>
+
+	<body name="ball" pos="0.5 0.5 2">
+	  <freejoint name="ball_free"/>
+	  <geom type="sphere" size="0.1"/>
+	</body>
+
+	<body name="target" mocap="true" pos="0 1 1">
+	  <geom type="cylinder" size="0.05 0.02" contype="0" conaffinity="0"/>
+	</body>
+  </worldbody>
+</mujoco>
