@@ -1,0 +1,420 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://demos/workcell.gd" id="1_khwge"]
+
+[sub_resource type="Environment" id="Environment_k32rd"]
+background_mode = 1
+background_color = Color(0.86, 0.89, 0.93, 1)
+ambient_light_source = 2
+ambient_light_color = Color(1, 1, 1, 1)
+ambient_light_energy = 0.55
+tonemap_mode = 2
+ssao_enabled = true
+
+[node name="Workcell" type="Node3D" unique_id=1532670339]
+script = ExtResource("1_khwge")
+
+[node name="Camera3D" type="Camera3D" parent="." unique_id=683994702]
+transform = Transform3D(0.8661856, -0.10264696, 0.48906657, 0, 0.97867644, 0.20540796, -0.49972242, -0.17792141, 0.84771544, 1.55, 1.35, 2.6)
+fov = 48.0
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=553044961]
+transform = Transform3D(0.81915206, -0.43938506, 0.36868784, 0, 0.64278764, 0.76604444, -0.57357645, -0.62750685, 0.5265408, 0, 0, 0)
+shadow_enabled = true
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1825733385]
+environment = SubResource("Environment_k32rd")
+
+[node name="MujocoWorld" type="MujocoWorld" parent="." unique_id=2020485122 groups=["mujoco"]]
+
+[node name="Floor" type="MujocoGeom" parent="MujocoWorld" unique_id=1830696215]
+overrides = {
+"color": Color(0.47, 0.5, 0.54, 1),
+"plane_half_size": Vector2(4, 4),
+"shape": 0
+}
+
+[node name="Pedestal" type="MujocoGeom" parent="MujocoWorld" unique_id=1931795448]
+overrides = {
+"color": Color(0.2, 0.22, 0.25, 1),
+"half_length": 0.1,
+"radius": 0.26,
+"shape": 5
+}
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, 0)
+
+[node name="Turret" type="MujocoBody" parent="MujocoWorld" unique_id=1206153043]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, 0)
+
+[node name="Yaw" type="MujocoJoint" parent="MujocoWorld/Turret" unique_id=1634412205]
+overrides = {
+"armature": 0.1,
+"damping": 15.0
+}
+
+[node name="Housing" type="MujocoGeom" parent="MujocoWorld/Turret" unique_id=1701044326]
+overrides = {
+"color": Color(0.95, 0.5, 0.15, 1),
+"half_length": 0.12,
+"mass": 4.0,
+"radius": 0.17,
+"shape": 5
+}
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.12, 0)
+
+[node name="UpperArm" type="MujocoBody" parent="MujocoWorld/Turret" unique_id=1205227018]
+transform = Transform3D(0.9659258, -0.25881904, 0, 0.25881904, 0.9659258, 0, 0, 0, 1, 0, 0.3, 0)
+
+[node name="Shoulder" type="MujocoJoint" parent="MujocoWorld/Turret/UpperArm" unique_id=1202847356]
+overrides = {
+"armature": 0.2,
+"axis": Vector3(0, 0, 1),
+"damping": 45.0,
+"limited": true,
+"range_lower": -1.0471975511965976,
+"range_upper": 1.0471975511965976
+}
+
+[node name="ShoulderHub" type="MujocoGeom" parent="MujocoWorld/Turret/UpperArm" unique_id=1784612050]
+overrides = {
+"color": Color(0.2, 0.22, 0.25, 1),
+"half_length": 0.13,
+"mass": 0.5,
+"radius": 0.11,
+"shape": 5
+}
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0)
+
+[node name="Link" type="MujocoGeom" parent="MujocoWorld/Turret/UpperArm" unique_id=1284345089]
+overrides = {
+"color": Color(0.95, 0.5, 0.15, 1),
+"half_length": 0.3,
+"mass": 3.0,
+"radius": 0.07,
+"shape": 3
+}
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3, 0)
+
+[node name="Forearm" type="MujocoBody" parent="MujocoWorld/Turret/UpperArm" unique_id=470222707]
+transform = Transform3D(-0.25881904, 0.9659258, 0, -0.9659258, -0.25881904, 0, 0, 0, 1, 0, 0.6, 0)
+
+[node name="Elbow" type="MujocoJoint" parent="MujocoWorld/Turret/UpperArm/Forearm" unique_id=671464990]
+overrides = {
+"armature": 0.1,
+"axis": Vector3(0, 0, 1),
+"damping": 25.0,
+"limited": true,
+"range_lower": -1.2217304763960306,
+"range_upper": 1.2217304763960306
+}
+
+[node name="ElbowHub" type="MujocoGeom" parent="MujocoWorld/Turret/UpperArm/Forearm" unique_id=565128833]
+overrides = {
+"color": Color(0.2, 0.22, 0.25, 1),
+"half_length": 0.11,
+"mass": 0.4,
+"radius": 0.09,
+"shape": 5
+}
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0)
+
+[node name="Link" type="MujocoGeom" parent="MujocoWorld/Turret/UpperArm/Forearm" unique_id=1625488179]
+overrides = {
+"color": Color(0.95, 0.5, 0.15, 1),
+"half_length": 0.25,
+"mass": 2.0,
+"radius": 0.055,
+"shape": 3
+}
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.25, 0)
+
+[node name="Wrist" type="MujocoBody" parent="MujocoWorld/Turret/UpperArm/Forearm" unique_id=1311929987]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+
+[node name="Roll" type="MujocoJoint" parent="MujocoWorld/Turret/UpperArm/Forearm/Wrist" unique_id=638933221]
+overrides = {
+"armature": 0.05,
+"damping": 1.5
+}
+
+[node name="Housing" type="MujocoGeom" parent="MujocoWorld/Turret/UpperArm/Forearm/Wrist" unique_id=1263712995]
+overrides = {
+"color": Color(0.2, 0.22, 0.25, 1),
+"half_length": 0.04,
+"mass": 0.4,
+"radius": 0.06,
+"shape": 5
+}
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.04, 0)
+
+[node name="Hand" type="MujocoBody" parent="MujocoWorld/Turret/UpperArm/Forearm/Wrist" unique_id=807507158]
+transform = Transform3D(0.8660254, 0.5, 0, -0.5, 0.8660254, 0, 0, 0, 1, 0, 0.1, 0)
+
+[node name="Pitch" type="MujocoJoint" parent="MujocoWorld/Turret/UpperArm/Forearm/Wrist/Hand" unique_id=1808032701]
+overrides = {
+"armature": 0.05,
+"axis": Vector3(0, 0, 1),
+"damping": 1.5,
+"limited": true,
+"range_lower": -1.3962634015954636,
+"range_upper": 1.3962634015954636
+}
+
+[node name="PitchHub" type="MujocoGeom" parent="MujocoWorld/Turret/UpperArm/Forearm/Wrist/Hand" unique_id=73102371]
+overrides = {
+"color": Color(0.2, 0.22, 0.25, 1),
+"mass": 0.1,
+"radius": 0.05,
+"shape": 2
+}
+
+[node name="Palm" type="MujocoGeom" parent="MujocoWorld/Turret/UpperArm/Forearm/Wrist/Hand" unique_id=1183607491]
+overrides = {
+"color": Color(0.7, 0.72, 0.75, 1),
+"half_extents": Vector3(0.1, 0.02, 0.045),
+"mass": 0.3,
+"shape": 6
+}
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.07, 0)
+
+[node name="FingerLeft" type="MujocoBody" parent="MujocoWorld/Turret/UpperArm/Forearm/Wrist/Hand" unique_id=202933176]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.035, 0.09, 0)
+
+[node name="Slide" type="MujocoJoint" parent="MujocoWorld/Turret/UpperArm/Forearm/Wrist/Hand/FingerLeft" unique_id=1223081339]
+overrides = {
+"armature": 0.1,
+"axis": Vector3(-1, 0, 0),
+"damping": 12.0,
+"limited": true,
+"range_lower": 0.0,
+"range_upper": 0.045,
+"type": 2
+}
+
+[node name="Pad" type="MujocoGeom" parent="MujocoWorld/Turret/UpperArm/Forearm/Wrist/Hand/FingerLeft" unique_id=2017607681]
+overrides = {
+"color": Color(0.2, 0.22, 0.25, 1),
+"half_extents": Vector3(0.012, 0.06, 0.035),
+"mass": 0.1,
+"shape": 6
+}
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.06, 0)
+
+[node name="FingerRight" type="MujocoBody" parent="MujocoWorld/Turret/UpperArm/Forearm/Wrist/Hand" unique_id=365594372]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.035, 0.09, 0)
+
+[node name="Slide" type="MujocoJoint" parent="MujocoWorld/Turret/UpperArm/Forearm/Wrist/Hand/FingerRight" unique_id=1256041958]
+overrides = {
+"armature": 0.1,
+"axis": Vector3(1, 0, 0),
+"damping": 12.0,
+"limited": true,
+"range_lower": 0.0,
+"range_upper": 0.045,
+"type": 2
+}
+
+[node name="Pad" type="MujocoGeom" parent="MujocoWorld/Turret/UpperArm/Forearm/Wrist/Hand/FingerRight" unique_id=1393529369]
+overrides = {
+"color": Color(0.2, 0.22, 0.25, 1),
+"half_extents": Vector3(0.012, 0.06, 0.035),
+"mass": 0.1,
+"shape": 6
+}
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.06, 0)
+
+[node name="GantryPost" type="MujocoGeom" parent="MujocoWorld" unique_id=633208456]
+overrides = {
+"color": Color(0.2, 0.22, 0.25, 1),
+"half_length": 0.85,
+"radius": 0.04,
+"shape": 5
+}
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.25, 0.85, 0.75)
+
+[node name="GantryBeam" type="MujocoGeom" parent="MujocoWorld" unique_id=1651110458]
+overrides = {
+"color": Color(0.2, 0.22, 0.25, 1),
+"half_length": 0.3,
+"radius": 0.035,
+"shape": 3
+}
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, -0.95, 1.7, 0.75)
+
+[node name="Chain" type="MujocoBody" parent="MujocoWorld" unique_id=2118536910]
+transform = Transform3D(0.95105654, -0.309017, 0, 0.309017, 0.95105654, 0, 0, 0, 1, -0.65, 1.66, 0.75)
+
+[node name="Ball" type="MujocoJoint" parent="MujocoWorld/Chain" unique_id=1949930907]
+overrides = {
+"damping": 0.02,
+"type": 1
+}
+
+[node name="Bar" type="MujocoGeom" parent="MujocoWorld/Chain" unique_id=1475398093]
+overrides = {
+"color": Color(0.42, 0.45, 0.5, 1),
+"half_length": 0.08,
+"radius": 0.024,
+"shape": 3
+}
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+
+[node name="Link2" type="MujocoBody" parent="MujocoWorld/Chain" unique_id=1151810431]
+transform = Transform3D(0.99026805, -0.1391731, 0, 0.1391731, 0.99026805, 0, 0, 0, 1, 0, -0.2, 0)
+
+[node name="Ball" type="MujocoJoint" parent="MujocoWorld/Chain/Link2" unique_id=991909357]
+overrides = {
+"damping": 0.02,
+"type": 1
+}
+
+[node name="Bar" type="MujocoGeom" parent="MujocoWorld/Chain/Link2" unique_id=2520661]
+overrides = {
+"color": Color(0.42, 0.45, 0.5, 1),
+"half_length": 0.08,
+"radius": 0.024,
+"shape": 3
+}
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+
+[node name="Link3" type="MujocoBody" parent="MujocoWorld/Chain/Link2" unique_id=1690013352]
+transform = Transform3D(0.99026805, -0.1391731, 0, 0.1391731, 0.99026805, 0, 0, 0, 1, 0, -0.2, 0)
+
+[node name="Ball" type="MujocoJoint" parent="MujocoWorld/Chain/Link2/Link3" unique_id=788718416]
+overrides = {
+"damping": 0.02,
+"type": 1
+}
+
+[node name="Bar" type="MujocoGeom" parent="MujocoWorld/Chain/Link2/Link3" unique_id=1782491190]
+overrides = {
+"color": Color(0.42, 0.45, 0.5, 1),
+"half_length": 0.08,
+"radius": 0.024,
+"shape": 3
+}
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+
+[node name="Link4" type="MujocoBody" parent="MujocoWorld/Chain/Link2/Link3" unique_id=1435785876]
+transform = Transform3D(0.99026805, -0.1391731, 0, 0.1391731, 0.99026805, 0, 0, 0, 1, 0, -0.2, 0)
+
+[node name="Ball" type="MujocoJoint" parent="MujocoWorld/Chain/Link2/Link3/Link4" unique_id=303038181]
+overrides = {
+"damping": 0.02,
+"type": 1
+}
+
+[node name="Bar" type="MujocoGeom" parent="MujocoWorld/Chain/Link2/Link3/Link4" unique_id=2038676811]
+overrides = {
+"color": Color(0.42, 0.45, 0.5, 1),
+"half_length": 0.08,
+"radius": 0.024,
+"shape": 3
+}
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+
+[node name="Link5" type="MujocoBody" parent="MujocoWorld/Chain/Link2/Link3/Link4" unique_id=580672172]
+transform = Transform3D(0.99026805, -0.1391731, 0, 0.1391731, 0.99026805, 0, 0, 0, 1, 0, -0.2, 0)
+
+[node name="Ball" type="MujocoJoint" parent="MujocoWorld/Chain/Link2/Link3/Link4/Link5" unique_id=1406223998]
+overrides = {
+"damping": 0.02,
+"type": 1
+}
+
+[node name="Bar" type="MujocoGeom" parent="MujocoWorld/Chain/Link2/Link3/Link4/Link5" unique_id=774604466]
+overrides = {
+"color": Color(0.42, 0.45, 0.5, 1),
+"half_length": 0.08,
+"radius": 0.024,
+"shape": 3
+}
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+
+[node name="Weight" type="MujocoGeom" parent="MujocoWorld/Chain/Link2/Link3/Link4/Link5" unique_id=1501477640]
+overrides = {
+"color": Color(0.85, 0.25, 0.25, 1),
+"radius": 0.07,
+"shape": 2
+}
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.24, 0)
+
+[node name="Platform" type="MujocoBody" parent="MujocoWorld" unique_id=52069511]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.05, 0.3, 0.2)
+
+[node name="Spring" type="MujocoJoint" parent="MujocoWorld/Platform" unique_id=1911564302]
+overrides = {
+"damping": 6.0,
+"limited": true,
+"range_lower": -0.15,
+"range_upper": 0.15,
+"stiffness": 400.0,
+"type": 2
+}
+
+[node name="Deck" type="MujocoGeom" parent="MujocoWorld/Platform" unique_id=61104234]
+overrides = {
+"color": Color(0.3, 0.55, 0.8, 1),
+"half_extents": Vector3(0.3, 0.02, 0.3),
+"mass": 1.0,
+"shape": 6
+}
+
+[node name="PlatformGuide" type="MujocoGeom" parent="MujocoWorld" unique_id=1766310355]
+overrides = {
+"color": Color(0.2, 0.22, 0.25, 1),
+"conaffinity": 0,
+"contype": 0,
+"half_length": 0.06,
+"radius": 0.05,
+"shape": 5
+}
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.05, 0.06, 0.2)
+
+[node name="Block1" type="MujocoBody" parent="MujocoWorld" unique_id=599148675]
+transform = Transform3D(0.9961947, -0.08715574, 0, 0.08715574, 0.9961947, 0, 0, 0, 1, 0.93, 0.55, 0.15)
+
+[node name="Free" type="MujocoJoint" parent="MujocoWorld/Block1" unique_id=1670722950]
+overrides = {
+"type": 0
+}
+
+[node name="Cube" type="MujocoGeom" parent="MujocoWorld/Block1" unique_id=1329419532]
+overrides = {
+"color": Color(0.9, 0.75, 0.2, 1),
+"density": 400.0,
+"half_extents": Vector3(0.06, 0.06, 0.06),
+"shape": 6
+}
+
+[node name="Block2" type="MujocoBody" parent="MujocoWorld" unique_id=1256224359]
+transform = Transform3D(0.90925515, -0.0058822855, 0.41619775, 0.08583164, 0.98106027, -0.17364818, -0.40729362, 0.19361344, 0.8925389, 1.05, 0.71, 0.19)
+
+[node name="Free" type="MujocoJoint" parent="MujocoWorld/Block2" unique_id=818612825]
+overrides = {
+"type": 0
+}
+
+[node name="Cube" type="MujocoGeom" parent="MujocoWorld/Block2" unique_id=850877573]
+overrides = {
+"color": Color(0.35, 0.7, 0.4, 1),
+"density": 400.0,
+"half_extents": Vector3(0.06, 0.06, 0.06),
+"shape": 6
+}
+
+[node name="Block3" type="MujocoBody" parent="MujocoWorld" unique_id=1925038935]
+transform = Transform3D(0.66317666, 0.20498298, 0.7198463, 0.081899606, 0.9361168, -0.34202012, -0.74396855, 0.2857749, 0.6040228, 1.17, 0.87, 0.23)
+
+[node name="Free" type="MujocoJoint" parent="MujocoWorld/Block3" unique_id=858487866]
+overrides = {
+"type": 0
+}
+
+[node name="Cube" type="MujocoGeom" parent="MujocoWorld/Block3" unique_id=1603582772]
+overrides = {
+"color": Color(0.8, 0.35, 0.6, 1),
+"density": 400.0,
+"half_extents": Vector3(0.06, 0.06, 0.06),
+"shape": 6
+}

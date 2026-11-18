@@ -4,6 +4,10 @@ A Godot extension that brings the [MuJoCo](https://mujoco.org) physics simulator
 
 > **Work in progress.** This is an early, actively changing project. Node names, properties and saved scenes may change without notice, and large parts of MuJoCo are not covered yet. It is not ready to build other projects on.
 
+![A robot arm with a gripper, a weight on a chain and a sprung platform holding three blocks](docs/images/workcell.png)
+
+*The workcell demo (`project/demos/workcell.tscn`): an arm with five hinge joints and a sliding two-finger gripper, driven by a short script; a chain on ball joints; and loose blocks on a sprung platform.*
+
 ## Status (November 2026)
 
 Works today:
@@ -42,7 +46,9 @@ Then open the `project/` folder in Godot.
 
 ## Trying it
 
-- **Run the demo.** Open `demos/shapes.tscn` and run it (F6). Four shapes fall onto a floor and a pendulum swings behind them.
+- **Run the demos.** Open a scene and run it (F6).
+  - `demos/workcell.tscn` is the one pictured above. Its script, `demos/workcell.gd`, shows how to read and drive joints from code.
+  - `demos/shapes.tscn` is the simplest: four shapes fall onto a floor and a pendulum swings behind them.
 - **Build something.** Add a `MujocoWorld` node. Under it add a `MujocoBody`, and under that a `MujocoGeom` for its shape and a `MujocoJoint` to let it move (set the joint's type to Free for a loose object). A `MujocoGeom` placed directly under the world is fixed scenery, such as a floor.
 - **Import a model.** Choose Project > Tools > Import MJCF... and pick an `.xml` file. `project/tests/models/arm.xml` is a small one that imports completely. The result is saved as an ordinary scene, and a window lists anything that was left out.
 
